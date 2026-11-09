@@ -76,7 +76,7 @@ input{font:inherit}
 </style>
 </head>
 <body>
-<main id="app"></main><button id="snd" class="snd" onclick="mute()" aria-label="Sonido">🔊</button>
+<main id="app"></main><button id="snd" class="snd" onclick="mute()" aria-label="Sound">🔊</button><button id="lang" class="snd" style="right:62px" onclick="setLang()" aria-label="Language">ES</button>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 // Multijugador fuera de Claude: emula "room" con PeerJS (WebRTC). Una persona actúa de centro y reenvía los mensajes.
@@ -163,7 +163,6 @@ u:[S("Contraataque",5,"ward",0,"","fis"),S("Corte de luna",12,"dmg",3.5,"f","fis
 Object.keys(X).forEach(k=>CL[k].sk.push(...X[k]));
 Object.values(CL).forEach(c=>c.sk.forEach(s=>s.p=s.p||(s.c?Math.ceil(s.c/3):2)));
 Object.values(CL).forEach(c=>c.sk[0].p=0);
-const DS=s=>({dmg:"Daño ×"+s.m,stun:"Daño ×"+s.m+" y aturde",drain:"Daño ×"+s.m+" y roba vida",heal:"Cura (Magia ×"+s.m+")",buff:"Próximo ataque ×2",pois:"Veneno 3 turnos",ward:"Mitad de daño 2 turnos",summon:"Aliado "+s.tt+" turnos"}[s.k])+" · "+(s.h?s.h+" de vida":s.c+" de maná");
 const EN=[
 {n:[["Rata gigante","🐀",34,7,"fuego","nat",["pois"]],["Lobo gris","🐺",50,9,"rayo","hielo",["rage"]],["Esqueleto","☠️",46,9,"luz","osc",["heavy"]],["Araña gigante","🕷️",42,8,"fuego","nat",["stun","pois"]],["Goblin","👺",44,10,"hielo","osc",["multi","drain"]]],e:[["Trol","🧌",95,12,"luz","osc",["heavy","rage"]],["Ogro","👹",105,13,"hielo","fuego",["heavy","stun"]]],b:[["Gran Lich","🧟",230,14,"luz","osc",["drain","pois","heal"]]]},
 {n:[["Murciélago vampiro","🦇",56,11,"fuego","osc",["drain","multi"]],["Zombi","🧟",75,10,"fuego","nat",["pois","heal"]],["Bandido","🥷",58,12,"rayo","luz",["multi","guard"]],["Escorpión","🦂",62,11,"hielo","fuego",["pois","stun"]]],e:[["Minotauro","🐂",130,15,"rayo","nat",["heavy","rage"]],["Hechicero oscuro","🧙",105,14,"luz","osc",["drain","pois","heal"]]],b:[["Hidra de tres cabezas","🐍",300,16,"fuego","hielo",["multi","pois","heal","rage"]]]},
@@ -194,15 +193,126 @@ function bump(i){const m=P.max,mm=P.mmax;P.st[i]++;derive();P.hp+=P.max-m;P.mp+=
 function go(s){scr=s;draw()}
 function opts(){OPTS=Object.keys(ND).filter(k=>!M||(k!="bat"&&k!="eli")).sort(()=>Math.random()-.5).slice(0,3)}
 
-// ---- 24 habilidades por clase ----
-const UT={g:["buff","ward","stun"],m:["stun","ward","drain"],p:["pois","buff","stun"],c:["heal","ward","buff"],a:["stun","pois","buff"],q:["ward","heal","buff"],n:["pois","drain","stun"],b:["buff","drain","stun"],i:["summon","summon","summon"],d:["heal","pois","stun"],s:["buff","stun","pois"],k:["stun","buff","heal"],r:["heal","stun","pois"],u:["buff","ward","stun"]};
-const DN={fis:"Corte",fuego:"Llamarada",hielo:"Escarcha",rayo:"Descarga",luz:"Destello",osc:"Sombra",nat:"Espina"},UN={stun:"Aturdir",pois:"Toxina",drain:"Succión",heal:"Sanación",ward:"Baluarte",buff:"Furia",summon:"Invocación"},RM=["I","II","III","IV","V","VI","VII","VIII","IX"];
-Object.keys(CL).forEach(k=>{const C=CL[k],E=[...new Set(C.sk.map(x=>x.e))],cf=C.st[1]>=7?1:.75,cnt={};
-for(let t=0;t<18;t++){const j=t%3,ut=UT[k][(t/3|0)%3],kd=j==1?ut:"dmg",el=j==1?E[0]:E[j==2?Math.min(1,E.length-1):0],id=kd+el,n=cnt[id]=(cnt[id]||0)+1;
-const x=S((kd=="dmg"?DN[el]:UN[kd])+" "+(RM[n-1]||n),Math.max(3,Math.round((4+t*.9)*cf)),kd,kd=="heal"?+(1.5+t*.3).toFixed(1):+(1.3+t*.2).toFixed(1),C.t,el);
-x.p=Math.max(2,Math.ceil(x.c/3));if(kd=="summon"){x.b=2+t;x.mm=+(.5+t*.06).toFixed(2);x.tt=3+(t>8?1:0)}
-C.sk.push(x)}
+// ---- habilidades: 6 propias por clase + 18 distintas generadas (efectos únicos, área y apoyo) ----
+const nf=v=>+(+v).toFixed(2);
+const AK=["heal","regen","shield","abuff","cleanse","ward","buff","summon","manab"],EK=["dmg","hits","exec","pierce","vamp"];
+function norm(s){if(s.fx)return s;const m=s.m||1;
+if(s.k=="dmg"){s.fx=[{k:"dmg",m,cb:s.cb}];s.tg="e"}
+else if(s.k=="stun"){s.fx=[{k:"dmg",m},{k:"stun"}];s.tg="e"}
+else if(s.k=="drain"){s.fx=[{k:"vamp",m}];s.tg="e"}
+else if(s.k=="heal"){s.fx=[{k:"heal",m}];s.tg="a"}
+else if(s.k=="buff"){s.fx=[{k:"buff"}];s.tg="s"}
+else if(s.k=="pois"){s.fx=[{k:"pois"}];s.tg="e"}
+else if(s.k=="ward"){s.fx=[{k:"ward"}];s.tg="s"}
+else if(s.k=="summon"){s.fx=[{k:"summon",b:s.b,mm:s.mm,tt:s.tt}];s.tg="s"}
+return s}
+// [nombre, objetivo (e enemigo, E todos los enemigos, a aliado a elegir, A todo el grupo, s uno mismo), efectos, factor de coste]
+const AR=[
+["Golpe doble","e",[{k:"hits",n:2,m:.85}],1],
+["Triple golpe","e",[{k:"hits",n:3,m:.7}],1.2],
+["Ejecutor","e",[{k:"exec",m:1.3,x:2}],1.1],
+["Perforar","e",[{k:"pierce",m:1.5}],1.1],
+["Tajo sangrante","e",[{k:"dmg",m:.9},{k:"bleed",m:.35}],1],
+["Quemadura","e",[{k:"dmg",m:.8},{k:"burn",m:.5}],1],
+["Golpe debilitante","e",[{k:"dmg",m:1},{k:"weak"}],1],
+["Golpe ralentizador","e",[{k:"dmg",m:1},{k:"slow"}],1],
+["Marca de vulnerabilidad","e",[{k:"dmg",m:.7},{k:"vuln"}],1],
+["Golpe vampírico","e",[{k:"vamp",m:1.2}],1.1],
+["Impacto aturdidor","e",[{k:"dmg",m:1.1},{k:"stun"}],1.2],
+["Toque venenoso","e",[{k:"dmg",m:.8},{k:"pois"}],1],
+["Estocada crítica","e",[{k:"dmg",m:1.4,cb:.5}],1.1],
+["Salpicadura","e",[{k:"dmg",m:1.1,sp:.5}],1.2],
+["Barrido","E",[{k:"dmg",m:.8}],1.5],
+["Onda expansiva","E",[{k:"dmg",m:.7},{k:"stun"}],1.8],
+["Aluvión","E",[{k:"dmg",m:1}],1.7],
+["Nube tóxica","E",[{k:"pois"}],1.5],
+["Lluvia ardiente","E",[{k:"dmg",m:.5},{k:"burn",m:.4}],1.7],
+["Grito aterrador","E",[{k:"weak"}],1.4],
+["Campo ralentizador","E",[{k:"slow"}],1.4],
+["Cadena mortal","E",[{k:"dmg",m:.6},{k:"bleed",m:.3}],1.7],
+["Resplandor abrasador","E",[{k:"dmg",m:.4},{k:"vuln"}],1.6],
+["Sanar","a",[{k:"heal",m:2}],1],
+["Regeneración","a",[{k:"regen",m:.8,t:3}],1],
+["Escudo protector","a",[{k:"shield",m:2}],1],
+["Bendición","a",[{k:"abuff"}],1],
+["Purificar","a",[{k:"cleanse"},{k:"heal",m:.8}],1],
+["Luz curativa","A",[{k:"heal",m:1}],1.8],
+["Aura protectora","A",[{k:"shield",m:1.2}],1.8],
+["Himno de guerra","A",[{k:"abuff"}],1.7],
+["Rocío vital","A",[{k:"regen",m:.5,t:3}],1.7],
+["Renovación","A",[{k:"cleanse"},{k:"heal",m:.6}],1.8],
+["Resurgir","a",[{k:"heal",m:3,rv:1}],1.3],
+["Concentración","s",[{k:"manab"}],.8],
+["Guardia férrea","s",[{k:"ward"}],.8],
+["Frenesí","s",[{k:"buff"}],.8],
+["Espectro aliado","s",[{k:"summon",b:2,mm:.5,tt:3}],1.2],
+["Bestia invocada","s",[{k:"summon",b:3,mm:.6,tt:3}],1.3],
+["Elemental menor","s",[{k:"summon",b:3,mm:.7,tt:3}],1.4],
+["Centinela","s",[{k:"summon",b:4,mm:.7,tt:4}],1.5],
+["Sombra servil","s",[{k:"summon",b:2,mm:.8,tt:4}],1.4]];
+const POOL={M:[0,1,2,3,4,6,7,8,9,10,12,13,14,15,19,21,25,35,36,22,11],R:[0,1,2,3,4,11,12,6,7,8,14,16,17,20,18,13,19,36,34,35,9],C:[5,9,7,8,10,3,15,16,18,17,19,20,22,21,14,34,35,13,4,6,11],H:[24,25,26,27,28,29,30,31,32,33,10,6,3,14,17,19,0,35,5,34,11],S:[37,38,39,40,41,28,29,24,31,25,16,17,18,14,15,34,35,6,20,26,33],Q:[0,2,3,6,9,10,12,13,14,15,19,25,26,27,28,29,35,36,21,8,33],D:[24,25,27,28,29,32,33,11,17,6,4,10,3,19,0,35,31,26,34,30,5],N:[24,31,5,9,7,8,10,16,17,18,19,20,21,14,34,35,13,27,28,32,23]};
+const CPOOL={g:"M",b:"M",k:"M",u:"M",q:"Q",a:"R",s:"R",p:"R",m:"C",n:"C",r:"N",c:"H",d:"D",i:"S"};
+const shf=(a,sd)=>{a=a.slice();let x=sd*9301+49297;for(let i=a.length-1;i>0;i--){x=(x*9301+49297)%233280;const j=Math.floor(x/233280*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+Object.keys(CL).forEach(k=>{const C=CL[k];C.sk.forEach(norm);const E=[...new Set(C.sk.map(x=>x.e))],cf=C.st[1]>=7?1:.75,ids=shf(POOL[CPOOL[k]],k.charCodeAt(0)).slice(0,18).sort((a,b)=>AR[a][3]-AR[b][3]||a-b);
+ids.forEach((id,t)=>{const a=AR[id],sc=1+t*.06,fx=a[2].map(x=>{const y={...x};if(y.m)y.m=nf(y.m*sc);if(y.b)y.b=nf(y.b*sc);return y}),c=Math.max(3,Math.round((3+t*.55)*a[3]*cf)),dm=fx.some(x=>EK.includes(x.k));
+C.sk.push({n:a[0],c,tg:a[1],t:C.t,e:dm?E[t%E.length]:E[0],fx,p:Math.max(2,Math.ceil(c/3))})});
 C.sk.forEach(x=>x.p=x.p||(x.c?Math.ceil(x.c/3):2));C.sk.sort((a,b)=>a.p-b.p);C.sk[0].p=0});
+const TGN={e:"1 enemigo",E:"Todos los enemigos",a:"1 aliado a elegir",A:"Todo el grupo",s:"A ti mismo"};
+const FXT=x=>({dmg:"Daño ×"+nf(x.m)+(x.sp?" (salpica "+Math.round(x.sp*100)+"%)":"")+(x.cb?" +crítico":""),hits:x.n+" golpes ×"+nf(x.m),exec:"Daño ×"+nf(x.m)+" (×"+x.x+" si queda poca vida)",pierce:"Daño ×"+nf(x.m)+" ignora defensas",vamp:"Daño ×"+nf(x.m)+" y roba vida",stun:"aturde",pois:"envenena",bleed:"sangrado",burn:"quemadura",weak:"debilita (−30% ataque)",slow:"ralentiza",vuln:"vulnerable (+30% daño)",heal:"cura (Magia ×"+nf(x.m)+")"+(x.rv?" y revive":""),regen:"regenera "+(x.t||3)+" turnos",shield:"escudo",abuff:"+25% daño "+(x.t||3)+" turnos",cleanse:"purifica",ward:"mitad de daño 2 turnos",buff:"próximo ataque ×2",summon:"aliado "+x.tt+" turnos",manab:"recupera maná"}[x.k]);
+const DS=s=>TGN[s.tg||"e"]+": "+s.fx.map(FXT).join(", ")+" · "+(s.h?s.h+" de vida":s.c+" de maná");
+const tgt2=x=>x.tg=="E"?" · Área":x.tg=="A"?" · Grupo":x.tg=="a"?" · Aliado":"";
+// efectos sobre enemigos
+function applyEff(e,x){e.hp-=Math.min(99999,Math.max(0,+x.d||0));if(x.st)e.stun=1;if(x.pz){e.pois=3;e.pd=Math.min(999,+x.pd||5)}
+if(x.dt){(e.dots=e.dots||[]).push({t:Math.min(5,+x.dt[0]||2),d:Math.min(999,+x.dt[1]||3)})}
+if(x.wk)e.wk=2;if(x.sl)e.sl=2;if(x.vu)e.vu=3}
+function calcEff(s,e,sh){F=e;const st=P.st[TI[s.t]]||P.st[0],eff={d:0};
+for(const x of s.fx){
+if(EK.includes(x.k)){const n=x.k=="hits"?x.n:1;for(let i=0;i<n;i++){const[d,c]=hit(x.m*sh,s.t,x.cb,s.e,0,x.k=="pierce");eff.d+=(x.k=="exec"&&e.hp<e.max*.35)?Math.round(d*x.x):d;if(c)eff.c=1}if(x.k=="vamp")eff.v=1}
+else if(x.k=="stun")eff.st=1;
+else if(x.k=="pois"){eff.pz=1;eff.pd=4+P.lvl}
+else if(x.k=="bleed")eff.dt=[3,Math.round(st*x.m*.5*sh)+P.lvl];
+else if(x.k=="burn")eff.dt=[2,Math.round(st*x.m*.7*sh)+P.lvl];
+else if(x.k=="weak")eff.wk=1;else if(x.k=="slow")eff.sl=1;else if(x.k=="vuln")eff.vu=1}
+return eff}
+// efectos sobre aliados (o sobre uno mismo)
+function allyVal(x,s){const m=x.m||1;if(x.k=="heal")return Math.round(P.st[1]*m+12+P.lvl);if(x.k=="regen")return Math.round(P.st[1]*.4*m+P.lvl)+3;if(x.k=="shield")return Math.round((P.st[1]*.7+P.st[3]*.5+P.lvl*2)*m)+10;if(x.k=="summon")return{n:s.n,d:x.b+P.st[1]*x.mm,t:x.tt,e:s.e};return 0}
+function recv(k,v,t,rv){if(P.down){if(k=="heal"&&rv){P.down=false;P.hp=Math.max(1,Math.min(P.max,+v||1))}return}
+if(k=="heal")P.hp=Math.min(P.max,P.hp+(+v||0));
+else if(k=="shield")P.sh=(P.sh||0)+Math.min(99999,+v||0);
+else if(k=="regen")P.rg={h:Math.min(9999,+v||0),t:Math.min(5,+t||3)};
+else if(k=="abuff")P.bf={d:.25,t:Math.min(5,+t||3)};
+else if(k=="cleanse"){P.pz=0;P.skip=0}
+else if(k=="ward")P.wd=2;else if(k=="buff")P.buff=true;
+else if(k=="manab")P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.35));
+else if(k=="summon")P.sm=v}
+function tickP(){if(P.rg&&P.rg.t>0){const h=Math.min(P.rg.h,P.max-P.hp);P.hp+=h;if(P.S)P.S.h+=h;if(--P.rg.t<=0)P.rg=null}if(P.bf&&--P.bf.t<=0)P.bf=null}
+function spSkill(s){P.mp-=s.c;if(s.h)P.hp-=s.h;let m=s.n;
+if(s.tg=="e"||s.tg=="E"){const eff=calcEff(s,F,1);applyEff(F,eff);P.S.d+=eff.d;m+=": "+eff.d+(eff.c?" (¡crítico!)":"")+HN;
+if(eff.v){const h=Math.min(Math.floor(eff.d/2),P.max-P.hp);P.hp+=h;P.S.h+=h;m+=" · +"+h}
+const ef=[eff.st&&"aturdido",eff.pz&&"envenenado",eff.dt&&"herida abierta",eff.wk&&"debilitado",eff.sl&&"ralentizado",eff.vu&&"vulnerable"].filter(Boolean);if(ef.length)m+=" ["+ef.join(", ")+"]"}
+const ae=s.fx.filter(x=>AK.includes(x.k));
+ae.forEach(x=>{const v=allyVal(x,s);if(x.k=="heal")P.S.h+=Math.min(v,P.max-P.hp);recv(x.k,v,x.t,x.rv)});
+if(ae.length)m+=s.tg=="A"?" → todo el grupo":" → ti";
+say(m)}
+// objetivos en multijugador
+function taId(rv){const al=roster();let q=al.find(z=>z.peer==M.ta);if(rv){if(!q||!q.presence.dn)q=al.find(z=>z.presence.dn)||q}
+if(!q||(!rv&&q.presence.dn))q=al.filter(z=>!z.presence.dn).sort((a,b)=>a.presence.hp/a.presence.mx-b.presence.hp/b.presence.mx)[0];return q}
+function allyTargets(s){const al=roster(),rv=s.fx.some(x=>x.rv);if(s.tg=="s")return al.filter(q=>q.peer==M.me);if(s.tg=="A")return al.filter(q=>rv||!q.presence.dn);const q=taId(rv);return q?[q]:[]}
+function mSkill(s,T,t,fx){const G=M.G;P.mp-=s.c;P.S.m+=s.c;if(s.h)P.hp-=s.h;let lg=M.name+": "+s.n;
+const ens=s.tg=="E"?G.en.map((e,i)=>[e,i,1]).filter(x=>x[0].hp>0):s.tg=="e"?[[T,t,1]]:[];
+const spl=s.fx.find(x=>x.sp);if(spl)G.en.forEach((e,i)=>{if(i!=t&&e.hp>0)ens.push([e,i,spl.sp])});
+let tot=0,tv=0,cr=0;
+ens.forEach(([e,i,sh])=>{const eff=calcEff(s,e,sh);fx.push({t:i,...eff});tot+=eff.d;if(eff.v)tv+=eff.d;if(eff.c)cr=1});
+if(ens.length){P.S.d+=tot;if(tv){const h=Math.min(Math.floor(tv/2),P.max-P.hp);P.hp+=h;P.S.h+=h}
+lg+=" → "+(ens.length>1?ens.length+" enemigos ("+tot+")":ens[0][0].n+" ("+tot+(cr?" ¡crítico!":"")+")")}
+const ae=s.fx.filter(x=>AK.includes(x.k));
+if(ae.length){const tg=allyTargets(s);
+tg.forEach(q=>ae.forEach(x=>{const v=allyVal(x,s);
+if(q.peer==M.me){if(x.k=="heal")P.S.h+=Math.min(v,P.max-P.hp);recv(x.k,v,x.t,x.rv)}
+else if(x.k=="heal"){M.rm.emit("hl",{to:q.peer,h:v,rv:x.rv?1:0});P.S.h+=v}
+else if(x.k!="summon")M.rm.emit("ef",{to:q.peer,k:x.k,v,t:x.t||3})}));
+lg+=tg.length>1?" → todo el grupo":tg.length&&tg[0].peer!=M.me?" → "+tg[0].presence.nm:""}
+return lg}
 // ---- armaduras ----
 const AN={g:"Coraza",m:"Túnica",p:"Capa",c:"Vestidura",a:"Casaca",q:"Armadura",n:"Mortaja",b:"Piel",i:"Estola",d:"Bata",s:"Chaqueta",k:"Faja",r:"Vestimenta",u:"Armadura"},AJ=["de cuero","de bronce","reforzada","de hierro","de acero","rúnica","de plata","encantada","de mithril","ancestral","de dragón","legendaria"];
 function ga(k,t){return[AN[k]+" "+AJ[t],[1,2,3,4,5,7,9,11,14,17,20,24][t],[0,4,8,12,16,22,28,34,42,50,60,72][t],1+t*3,k,"A",t]}
@@ -227,7 +337,7 @@ const MET=["#8b7d6b","#b4733a","#aab4bf","#7fa0c0","#d7dce2","#e0b94a","#6fd0c0"
 const lt=c=>{const n=parseInt(c.slice(1),16);return"#"+[16,8,0].map(h=>Math.min(255,((n>>h)&255)+70).toString(16).padStart(2,"0")).join("")};
 const pl=(b,g)=>({b,B:lt(b),g:g||b,G:lt(g||b),h:"#8a5a2b",o:"#150d1f"}),SP={},EP={};
 function spr(k,T,pal){if(!SP[k]){const c=document.createElement("canvas");c.width=c.height=10;const x=c.getContext("2d");TP[T].forEach((r,y)=>[...r].forEach((ch,i)=>{if(pal[ch]){x.fillStyle=pal[ch];x.fillRect(i,y,1,1)}}));SP[k]=c.toDataURL()}return'<img class="px" alt="" src="'+SP[k]+'">'}
-function fa(e,z){if(!EP[e]){const c=document.createElement("canvas");c.width=c.height=20;const x=c.getContext("2d");x.font="16px sans-serif";x.textAlign="center";x.textBaseline="middle";x.fillText(e,10,11);EP[e]=c.toDataURL()}return'<img class="px" alt="" style="width:'+z+'px;height:'+z+'px" src="'+EP[e]+'">'}
+function fa0(e,z){if(!EP[e]){const c=document.createElement("canvas");c.width=c.height=20;const x=c.getContext("2d");x.font="16px sans-serif";x.textAlign="center";x.textBaseline="middle";x.fillText(e,10,11);EP[e]=c.toDataURL()}return'<img class="px" alt="" style="width:'+z+'px;height:'+z+'px" src="'+EP[e]+'">'}
 function ico(it){if(isA(it))return spr("A"+it[6]+it[4],"A",pl(ARC[it[6]],ELC[CL[it[4]].we[0]]));return spr(it[0]+it[8],NM[it[0].split(" ")[0]]||"S",pl(MET[it[8]],ELC[it[5]]))}
 const PIC=k=>({h:spr("pr","P",pl("#e0453a")),m:spr("pb","P",pl("#3f7be0")),s:spr("st","K",pl("#9aa5b1")),a:spr("am","M",pl("#ffd23f","#6ee7ff"))}[k]);
 const IC=(it,z)=>'<span class="ic" style="width:'+z+'px;height:'+z+'px">'+ico(it)+'</span>';
@@ -235,7 +345,7 @@ const slots=()=>Array.from({length:Math.max(20,Math.ceil(P.inv.length/5)*5)},(_,
 const det=(it,sl)=>{const tm=M&&M.rm&&TM&&TM.i==SEL;let h='<div class="row" style="margin-top:10px">'+IC(it,48)+'<div class="grow"><b>'+wl(it)+'</b><br><span class="num">'+req(it)+'</span></div></div><div class="acts" style="margin-top:8px"><button '+(can(it)?'':'disabled')+' onclick="eq('+SEL+')">Equipar</button>'+(sl?'<button onclick="sell('+SEL+')">Vender · '+val(it)+'</button>':'')+'</div>';
 if(M&&M.rm){const ot=roster().filter(q=>q.peer!=M.me);
 if(!tm)h+='<div class="acts" style="margin-top:0"><button '+(ot.length?'':'disabled')+' onclick="TM={m:\'g\',i:'+SEL+'};draw()">Dar a...</button><button '+(ot.length&&!M.out?'':'disabled')+' onclick="TM={m:\'t\',i:'+SEL+'};draw()">Intercambiar</button></div>';
-else h+='<div class="card" style="margin-top:8px"><b>'+(TM.m=="g"?'¿A quién se lo das?':'¿Con quién intercambias?')+'</b>'+ot.map(q=>'<button class="pick" style="margin:6px 0 0;padding:8px" onclick="'+(TM.m=="g"?'mgive':'moffer')+'('+SEL+',\''+q.peer+'\')">'+fa(CL[q.presence.c].e,24)+' '+esc(q.presence.nm)+'</button>').join('')+'<button class="sm" style="margin-top:8px;width:100%" onclick="TM=null;draw()">Cancelar</button></div>'}
+else h+='<div class="card" style="margin-top:8px"><b>'+(TM.m=="g"?'¿A quién se lo das?':'¿Con quién intercambias?')+'</b>'+ot.map(q=>'<button class="pick" style="margin:6px 0 0;padding:8px" onclick="'+(TM.m=="g"?'mgive':'moffer')+'('+SEL+',\''+q.peer+'\')">'+hs(q.presence.c,24)+' '+esc(q.presence.nm)+'</button>').join('')+'<button class="sm" style="margin-top:8px;width:100%" onclick="TM=null;draw()">Cancelar</button></div>'}
 return h};
 function tog(i){const q=P.eq.indexOf(i);if(q>=0)P.eq.splice(q,1);else if(P.eq.length<4)P.eq.push(i);draw()}
 
@@ -246,7 +356,7 @@ function tn(f,d,ty,v,f2,t0){const c=aud();if(!c||!AU.on)return;const o=c.createO
 function nz(d,v){const c=aud();if(!c||!AU.on)return;const n=Math.floor(c.sampleRate*d),b=c.createBuffer(1,n,c.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const o=c.createBufferSource(),g=c.createGain();o.buffer=b;g.gain.value=v||.1;o.connect(g);g.connect(c.destination);o.start()}
 const SFX={turn:()=>{tn(880,.12,"triangle",.09);tn(1175,.16,"triangle",.1,0,.1)},atk:()=>{nz(.12,.12);tn(220,.12,"sawtooth",.07,80)},def:()=>{tn(110,.18,"sine",.16,55);nz(.05,.06)},heal:()=>{tn(523,.14,"sine",.1);tn(784,.22,"sine",.1,0,.12)},rev:()=>{[392,523,659,784,1046].forEach((f,i)=>tn(f,.18,"triangle",.1,0,i*.09))},hit:()=>{tn(140,.18,"sawtooth",.1,50);nz(.08,.1)},win:()=>{[523,659,784,1046].forEach((f,i)=>tn(f,.2,"square",.07,0,i*.12))},lose:()=>{[392,330,262,196].forEach((f,i)=>tn(f,.3,"triangle",.1,0,i*.2))}};
 const snd=k=>{try{SFX[k]&&SFX[k]()}catch(e){}};
-const sfx=k=>{if(k=="d")return"def";if(k=="p"||k=="q")return"heal";if(k=="r")return"rev";if(typeof k=="number"){const t=CL[P.c].sk[k].k;return t=="heal"?"heal":(t=="ward"||t=="buff"||t=="summon")?"def":"atk"}return"atk"};
+const sfx=k=>{if(k=="d")return"def";if(k=="p"||k=="q")return"heal";if(k=="r")return"rev";if(typeof k=="number"){const ks=(CL[P.c].sk[k].fx||[]).map(x=>x.k),at=ks.some(x=>EK.includes(x)),he=ks.includes("heal")||ks.includes("regen");return he?"heal":at?"atk":"def"}return"atk"};
 function amb(){clearInterval(AU.t);if(!AU.on)return;let i=0;const sc=[196,220,262,294,330,392,440];AU.t=setInterval(()=>{i++;tn(pk(sc)/(Math.random()<.3?2:1),1.8,"triangle",.03);if(i%4==0)tn(65,5,"sine",.05);if(i%5==0)tn(pk(sc)*1.5,2.4,"sine",.018)},1400)}
 function mute(){AU.on=!AU.on;$("snd").textContent=AU.on?"🔊":"🔇";amb()}
 if(document.addEventListener)document.addEventListener("pointerdown",()=>{if(!AU.s){AU.s=1;aud();amb()}},{once:true});
@@ -263,7 +373,7 @@ const ROUTE={lobby:"lobby",play:"mfight",vote:"mvote",shop:"mshop",node:"mwait",
 function mResume(){const o=ld();if(!o)return;P=o.P;P.down=false;if(P.hp<=0)P.hp=Math.ceil(P.max*.3);M={host:!!o.host,code:o.code,name:o.name,pid:o.pid,rid:o.rid,G:o.host?o.G:null,tg:0,busy:false,rd:false,v:-1,fn:0,tk:"",rm:null,me:o.pid,first:0,resume:1,hres:o.host&&o.G?1:0};mJoin()}
 function hResume(){const G=M.G;bc();if(G.ph=="play"){G.cur=null;hRound()}else if(G.ph=="vote"){clearTimeout(M.vt);M.vt=setTimeout(()=>{if(M.G===G&&G.ph=="vote")hDecide()},60000)}else if(G.ph=="shop"){clearTimeout(M.to);M.to=setTimeout(()=>{if(M.G===G&&G.ph=="shop")hShopNext()},60000)}}
 function mCatch(d){const miss=d.f-P.f;P.down=false;if(P.hp<=0)P.hp=Math.ceil(P.max*.3);
-if(miss>0){P.f=d.f;P.lvl+=miss;P.pts+=3*miss;P.sp+=miss;derive();P.hp=P.max;P.mp=P.mmax;M.note="Volviste a la partida: subiste "+miss+" nivel(es) mientras no estabas."}
+if(miss>0){let sg=0;for(let n=P.f+1;n<=d.f;n++)sg+=n>=20?2:1;P.f=d.f;P.lvl+=miss;P.pts+=3*miss;P.sp+=sg;derive();P.hp=P.max;P.mp=P.mmax;M.note="Volviste a la partida: subiste "+miss+" nivel(es) mientras no estabas."}
 else M.note="Volviste a la partida.";
 if(d.ph=="shop"||d.ph=="node")M.sk=d.f;if(d.ph=="node"){M.nk=d.f;M.rd=true;upP()}M.fn=d.ph=="play"?0:d.n;M.G=d;go(ROUTE[d.ph]||"lobby")}
 function hostWatch(){if(!M||M.host||M.late||!M.rm)return;if(roster().some(z=>z.presence.h)){M.hl=0;return}if(Date.now()-M.t0<7000)return;if(!M.hl)M.hl=Date.now();if(Date.now()-M.hl>180000){M.late=1;MSG="El anfitrión no volvió a la sala.";go("mnone")}}
@@ -285,7 +395,8 @@ r.on("fx",m=>{if(M.host)hFx(m)});
 r.on("buy",m=>{if(M.host)hBuy(m)});
 r.on("sd",m=>{if(M.host)hSd(m)});
 r.on("eh",m=>onEh(m.data));
-r.on("hl",m=>{const d=m.data;if(d&&d.to==M.me&&!P.down){P.hp=Math.min(P.max,P.hp+(+d.h||0));snd("heal");upP();draw()}});
+r.on("hl",m=>{const d=m.data;if(d&&d.to==M.me){recv("heal",+d.h||0,0,d.rv);snd("heal");upP();draw()}});
+r.on("ef",m=>{const d=m.data;if(d&&d.to==M.me&&["regen","shield","abuff","cleanse","ward","buff","manab"].includes(d.k)){recv(d.k,+d.v||0,+d.t||3);snd("heal");upP();draw()}});
 r.on("rv",m=>{const d=m.data;if(d&&d.to==M.me&&P.down){P.down=false;P.hp=Math.ceil(P.max*.35);snd("rev");upP();draw()}});
 r.on("hi",()=>{if(M.host)bc()});
 r.on("gv",m=>{const d=m.data;if(d&&d.to==M.me&&okIt(d.it)){P.inv.push(d.it);M.note=rn(sid(m))+" te dio "+d.it[0]+".";snd("heal");draw()}});
@@ -308,16 +419,16 @@ if(G.ph=="shop"&&G.cur&&!ps.some(z=>z.peer==G.cur))hShopNext()}
 function hStart(){if(M.G.ph!="lobby")return;hSpawn()}
 function hGo(){if(M.G.ph=="node")hSpawn()}
 function hSpawn(){const G=M.G,N=Math.max(1,roster().length),n=G.f+1,r=Math.random(),k=n%10==0?"b":r<.18?"e":r<.48?"h":"n";G.N=N;
-const Z=EN[Math.min(3,Math.floor((n-1)/10))],sh=(1+.17*(n-1))*(1+.65*(N-1)),sa=(1+.07*(n-1))*(1+.12*(N-1));
-const list=k=="b"?[Z.b[0]]:k=="e"?[pk(Z.e)]:Array.from({length:k=="h"?Math.min(4,2+(N>1?1:0)+(N>2&&Math.random()<.5?1:0)):(N>2?2:1)},()=>pk(Z.n));
+const Z=EN[Math.min(3,Math.floor((n-1)/10))],sh=HPS(n)*(1+.6*(N-1)),sa=ATS(n)*(1+.12*(N-1));
+const list=k=="b"?[pk(Z.b)]:k=="e"?[pk(Z.e)]:Array.from({length:k=="h"?Math.min(4,2+(N>1?1:0)+(N>2&&Math.random()<.5?1:0)):(N>3?3:N>1?2:1)},()=>pk(Z.n));
 const hz=k=="h"?.7:(list.length>1?.8:1),tot={},seen={};list.forEach(b=>tot[b[0]]=(tot[b[0]]||0)+1);
-G.en=list.map(b=>{seen[b[0]]=(seen[b[0]]||0)+1;const h=Math.round(b[2]*sh*hz),k2=b[6];return{n:b[0]+(tot[b[0]]>1?" "+"ABCD"[seen[b[0]]-1]:""),e:b[1],hp:h,max:h,atk:Math.round(b[3]*sa),sp:Math.max(1,Math.round(((k2.includes("multi")?7:5)+(k2.includes("heavy")?-2:0)+(k2.includes("rage")?1:0)+R(0,3))*(1+.05*(n-1)))),w:b[4],r:b[5],sk:k2,pois:0,pd:5,stun:0,g:0}});
+G.en=list.map(b=>{seen[b[0]]=(seen[b[0]]||0)+1;const h=Math.round(b[2]*sh*hz*(k=="b"?1.2:1)),k2=b[6];return{n:b[0]+(tot[b[0]]>1?" "+"ABCD"[seen[b[0]]-1]:""),e:b[1],hp:h,max:h,atk:Math.round(b[3]*sa),sp:Math.max(1,Math.round(((k2.includes("multi")?7:5)+(k2.includes("heavy")?-2:0)+(k2.includes("rage")?1:0)+R(0,3))*(1+.05*(n-1)))),w:b[4],r:b[5],sk:k2,pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0}});
 G.k=k;G.n=n;G.g=Math.round(list.length*({b:100,e:42,h:17,n:17}[k])*(1+n*.1)*(.9+Math.random()*.2));
 G.lg=[(k=="b"?"¡Jefe! ":k=="e"?"¡Élite! ":k=="h"?"¡Horda! ":"")+G.en.map(e=>e.n).join(", ")+(N>1?" ("+N+" jugadores)":"")];G.rd=0;hRound()}
 // orden de turnos por velocidad
 function hRound(){const G=M.G;G.rd++;G.ph="play";const q=[];
 roster().forEach(p=>{if(!p.presence.dn)q.push({k:"p",i:p.peer,s:(p.presence.sp||1)+Math.random()*.9,e:CL[p.presence.c].e,n:p.presence.nm})});
-G.en.forEach((e,i)=>{if(e.hp>0)q.push({k:"e",i,s:e.sp+Math.random()*.9,e:e.e,n:e.n})});
+G.en.forEach((e,i)=>{if(e.hp>0)q.push({k:"e",i,s:e.sp*(e.sl>0?.6:1)+Math.random()*.9,e:e.e,n:e.n})});
 q.sort((a,b)=>b.s-a.s);G.q=q.map(x=>({k:x.k,i:x.i,e:x.e,n:x.n,s:Math.floor(x.s)}));G.ti=-1;hNext()}
 function hNext(){const G=M.G;clearTimeout(M.to);if(G.ph!="play")return;
 if(G.en.every(e=>e.hp<=0))return hWin();
@@ -327,11 +438,13 @@ const x=G.q[G.ti];
 if(x.k=="e"){const e=G.en[x.i];if(!e||e.hp<=0)return hNext();G.cur=null;G.cn=e.n;bc();setTimeout(()=>{if(M&&M.host&&M.G===G&&G.ph=="play")hEnemy(e)},900);return}
 const q=ps.find(p=>p.peer==x.i);if(!q||q.presence.dn)return hNext();
 G.cur=x.i;G.cn=q.presence.nm;bc();M.to=setTimeout(()=>{if(M.G===G&&G.ph=="play"&&G.cur==x.i){lgp(G.cn+" pierde el turno.");hNext()}},45000)}
-function applyFx(fx){const G=M.G;(fx||[]).forEach(x=>{const e=G.en[x.t];if(!e||e.hp<=0)return;e.hp-=Math.min(99999,Math.max(0,+x.d||0));if(x.st)e.stun=1;if(x.pz){e.pois=3;e.pd=Math.min(999,+x.pd||5)}})}
+function applyFx(fx){const G=M.G;(fx||[]).forEach(x=>{const e=G.en[x.t];if(!e||e.hp<=0)return;applyEff(e,x)})}
 function hFx(m){const G=M.G;if(G.ph=="play"&&m.data)applyFx(m.data.fx)}
 function hAct(m){const G=M.G,a=m.data;if(G.ph!="play"||!a||G.cur!=sid(m))return;clearTimeout(M.to);applyFx(a.fx);if(a.lg)lgp(String(a.lg).slice(0,90));G.cur=null;bc();setTimeout(()=>{if(M&&M.G===G&&G.ph=="play")hNext()},900)}
 function hEnemy(e){const G=M.G,nx=t=>setTimeout(()=>{if(M&&M.host&&M.G===G&&G.ph=="play")hNext()},t);
 if(e.pois>0){e.pois--;e.hp-=e.pd;lgp(e.n+" sufre veneno ("+e.pd+").");if(e.hp<=0){lgp(e.n+" cae.");bc();return nx(800)}}
+if(e.dots&&e.dots.length){let t=0;e.dots=e.dots.filter(o=>{t+=o.d;return--o.t>0});e.hp-=t;lgp(e.n+" sufre daño continuo ("+t+").");if(e.hp<=0){lgp(e.n+" cae.");bc();return nx(800)}}
+const wk=e.wk>0;if(e.wk>0)e.wk--;if(e.vu>0)e.vu--;if(e.sl>0)e.sl--;
 if(e.g>0)e.g--;
 if(e.stun){e.stun=0;lgp(e.n+" está aturdido.");bc();return nx(800)}
 const al=alive();if(!al.length)return hNext();
@@ -339,7 +452,7 @@ const t=pk(al),k=e.sk.length&&Math.random()<.35+Math.min(.3,G.n*.006)?pk(e.sk):"
 if(k=="heal"){const h=Math.round(e.max*.2);e.hp=Math.min(e.max,e.hp+h);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="rage"){e.atk=Math.round(e.atk*1.25);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="guard"){e.g=2;lgp(e.n+" adopta una postura defensiva.");bc();return nx(900)}
-let raw=e.atk+R(-2,3);if(k=="heavy")raw=Math.round(raw*1.8);if(k=="multi")raw=Math.round(raw*1.4);
+let raw=Math.round(e.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")raw=Math.round(raw*1.8);if(k=="multi")raw=Math.round(raw*1.4);
 if(k=="drain")e.hp=Math.min(e.max,e.hp+Math.floor(raw*.4));
 lgp(e.n+(k?" usa "+ESK[k]:" ataca")+" a "+t.presence.nm+".");bc();M.rm.emit("eh",{to:t.peer,raw,k,pd:Math.round(2+e.atk*.12)});nx(1400)}
 function hWin(){const G=M.G;clearTimeout(M.to);G.f=G.n;G.cur=null;lgp("¡Combate "+G.n+" superado!");
@@ -376,7 +489,7 @@ else if(d.ph=="shop"&&M.sk!=d.f){M.sk=d.f;go("mshop")}
 else if(d.ph=="node"&&M.nk!=d.f){M.nk=d.f;mNode(d)}
 if(d.ph=="end"&&scr!="mend"){snd(d.w?"win":"lose");go("mend");return}
 if(["lobby","mwait","mfight","mend","mvote","mshop"].includes(scr))draw()}
-function onTurn(d){if(d.cur==M.me&&!P.down){M.busy=false;P.def=false;snd("turn");
+function onTurn(d){if(d.cur==M.me&&!P.down){M.busy=false;P.def=false;snd("turn");tickP();
 if(P.pz>0){P.pz--;P.hp-=P.pzd;P.S.t+=P.pzd;if(P.hp<=0){P.hp=0;P.down=true;M.busy=true;upP();M.rm.emit("act",{fx:[],lg:M.name+" cae envenenado."});draw();return}}
 if(P.sm){const i=d.en.findIndex(e=>e.hp>0),x=Math.max(1,Math.round(P.sm.d));if(i>=0){M.rm.emit("fx",{fx:[{t:i,d:x}]});P.S.d+=x}if(--P.sm.t<=0)P.sm=null}
 if(P.skip){P.skip=0;M.busy=true;M.rm.emit("act",{fx:[],lg:M.name+" está paralizado."})}
@@ -387,7 +500,7 @@ function mvote(i){if(!M.G||M.G.ph!="vote")return;M.v=M.G.f*10+i;upP();draw()}
 function tgi(){const en=M.G.en;if(en[M.tg]&&en[M.tg].hp>0)return M.tg;const i=en.findIndex(e=>e.hp>0);return i<0?0:i}
 function onEh(d){if(!d||!M||d.to!=M.me||P.down)return;
 if(Math.random()<P.st[2]*.008){snd("def");return}
-let x=Math.round((+d.raw||1)*100/(100+DEF()*4))-Math.floor(DEF()/3);if(P.def)x=Math.ceil(x/2);if(P.wd>0){x=Math.ceil(x/2);P.wd--}x=Math.max(1,x);
+let x=Math.round((+d.raw||1)*100/(100+DEF()*4))-Math.floor(DEF()/3);if(P.def)x=Math.ceil(x/2);if(P.wd>0){x=Math.ceil(x/2);P.wd--}x=Math.max(1,x);if(P.sh>0){const a=Math.min(P.sh,x);P.sh-=a;x-=a}
 P.hp-=x;P.S.t+=x;snd("hit");
 if(d.k=="pois"){P.pz=3;P.pzd=Math.min(999,+d.pd||3)}
 if(d.k=="stun")P.skip=1;
@@ -402,19 +515,12 @@ else if(k=="d"){P.def=true;P.mp=Math.min(P.mmax,P.mp+3);lg=M.name+" se defiende.
 else if(k=="p"){P.pot--;const h=Math.min(Math.ceil(P.max*.4),P.max-P.hp);P.hp+=h;P.S.h+=h;lg=M.name+" bebe una poción."}
 else if(k=="q"){P.mpot--;P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.4));lg=M.name+" bebe una poción de maná."}
 else if(k=="r"){const z=roster().find(q=>q.presence.dn);P.mp-=8;P.S.m+=8;if(z){M.rm.emit("rv",{to:z.peer});P.S.r++;lg=M.name+" revive a "+z.presence.nm+"."}}
-else{const s=C.sk[k];P.mp-=s.c;P.S.m+=s.c;if(s.h)P.hp-=s.h;
-if(s.k=="dmg"||s.k=="stun"||s.k=="drain"){const[d,c]=hit(s.m,s.t,s.cb,s.e);fx.push({t,d,st:s.k=="stun"?1:0});P.S.d+=d;lg=M.name+": "+s.n+" a "+T.n+" ("+d+(c?" ¡crítico!":"")+")"+HN;if(s.k=="drain"){const h=Math.min(Math.floor(d/2),P.max-P.hp);P.hp+=h;P.S.h+=h}}
-if(s.k=="summon"){P.sm={n:s.n,d:s.b+P.st[1]*s.mm,t:s.tt,e:s.e};lg=M.name+" invoca a "+s.n+"."}
-if(s.k=="buff"){P.buff=true;lg=M.name+" se enfurece."}
-if(s.k=="ward"){P.wd=2;lg=M.name+" levanta un escudo."}
-if(s.k=="pois"){fx.push({t,pz:1,pd:4+P.lvl});lg=M.name+" envenena a "+T.n+"."}
-if(s.k=="heal"){const h=P.st[1]*s.m+12,z=roster().filter(q=>!q.presence.dn).sort((a,b)=>a.presence.hp/a.presence.mx-b.presence.hp/b.presence.mx)[0];
-if(z&&z.peer!=M.me){M.rm.emit("hl",{to:z.peer,h});P.S.h+=h;lg=M.name+" cura a "+z.presence.nm+" (+"+h+")."}else{const a=Math.min(h,P.max-P.hp);P.hp+=a;P.S.h+=a;lg=M.name+" se cura (+"+a+")."}}}
+else{lg=mSkill(C.sk[k],T,t,fx)}
 M.rm.emit("act",{fx,lg});upP();draw()}
 function mReady(){M.rd=true;upP();go("mwait")}
 function mWon(d){const k=d.k;P.f=d.f;P.down=false;M.rd=false;M.v=-1;snd("win");
-P.lvl++;P.pts+=3;P.sp++;derive();P.hp=Math.min(P.max,Math.max(P.hp,Math.ceil(P.max*.25))+Math.ceil(P.max*.25));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.4));
-const g=Math.round(d.g/Math.max(1,d.N)*P.gm);P.gold+=g;let t="Tu parte del botín: +"+g+" de oro. Nivel "+P.lvl+" (+3 puntos y +1 de habilidad). ";
+P.lvl++;P.pts+=3;P.sp+=d.f>=20?2:1;derive();P.hp=Math.min(P.max,Math.max(P.hp,Math.ceil(P.max*.25))+Math.ceil(P.max*.25));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.4));
+const g=Math.round(d.g/Math.max(1,d.N)*P.gm);P.gold+=g;let t="Tu parte del botín: +"+g+" de oro. Nivel "+P.lvl+" (+3 puntos y +"+(d.f>=20?2:1)+" de habilidad). ";
 if(k!="n"||Math.random()<.5){const w=drop(k=="n"?0:1);P.inv.push(w);t+="Objeto: "+w[0]+" (para "+CL[cls(w)].n+"). "}
 if(k=="b"){P.ws+=2;t+="+2 piedras de afilar. "}else if(Math.random()<.25){P.ws++;t+="+1 piedra de afilar."}
 MSG=t;upP();if(k=="b"){rl();return}go("mvote")}
@@ -439,12 +545,690 @@ const o=M.out,i=M.in;
 if(o)h+='<div class="card"><h2>Intercambio</h2>Ofreces <b>'+wl(o.it)+'</b>'+(o.st=="wait"?' a '+esc(rn(o.to))+'. Esperando respuesta...<div class="acts" style="margin:8px 0 0"><button class="wide" onclick="mcancel()">Cancelar</button></div>':'.<br>'+esc(rn(o.to))+' ofrece: <b>'+wl(o.their)+'</b><div class="acts" style="margin:8px 0 0"><button onclick="macc()">Aceptar</button><button onclick="mcancel()">Rechazar</button></div>')+'</div>';
 if(i)h+='<div class="card"><h2>Te ofrecen un intercambio</h2>'+esc(rn(i.from))+' ofrece <b>'+wl(i.it)+'</b>.'+(i.mine?'<br>Tú ofreciste '+wl(i.mine)+'. Esperando confirmación...':'<br>Elige qué darle a cambio:<div class="grid" style="margin:8px 0">'+P.inv.map((x,k)=>'<button class="slot" onclick="mpick('+k+')">'+ico(x)+'</button>').join('')+'</div>')+'<div class="acts" style="margin:8px 0 0"><button class="wide" onclick="mrej()">Rechazar</button></div></div>';
 return h}
-function draw(){draw0();if(M&&M.rm&&scr!="menu"){const b=tradeUI(),a=$("app");if(b&&a&&a.insertAdjacentHTML)a.insertAdjacentHTML("afterbegin",b)}}
+// ---- pixel art propio: héroes, enemigos e iconos (se dibujan al vuelo) ----
+const HALF={
+H:"........|.....hhh|....hhhh|....hkkk|....kpkk|.....kkk|......kk|...aaaaa|..aaAaaa|..aaaaaa|..kaaccc|...aaaaa|....bbbb|....bbbb|...bbbbb|........",
+HR:"........|.....hhh|....hhhh|....hkkk|....kpkk|.....kkk|......kk|...aaaaa|..aaAaaa|..aaaaaa|..kaaccc|..aaaaaa|..aabaaa|.aaaaaaa|.aabbbbb|.bbbbbbb",
+Q:"........|...a....|...aa...|..aaaaaa|..aaaaaa|..aepaaa|..aaaccc|...aacpc|...aamtt|..aaaaaa|..aAaaaa|..aaaaaa|..aabbaa|..aabbaa|..ccbbcc|........",
+I:"........|........|b.......|.b..aaaa|..b.aepa|b.baaaaa|.b.aaaaa|..aaAaaa|b.aaaaaa|.baaAAaa|baaaaaaa|b.aaabaa|.baabbaa|b..aabba|....aaaa|........",
+B:"........|........|......aa|....aaaa|...aAAaa|..aAaaaa|..aaaaaa|..aaepaa|..aaaaaa|..aaammm|.aaaaaaa|.aabaaaa|.aaaaaaa|.abbbbbb|..bbbbbb|........",
+F:".......a|......aa|.....aaa|....aaAa|...aaAAa|...aAAcc|..aaepcc|..aAAccc|..aaAAcc|.aaaAAAc|.aaaaAAA|.aabaaAA|..aabbaa|...aabba|....bbbb|........",
+W:"........|....a...|....aa..|aa..aaaa|aAa.aaaa|aAaaaepa|aAaaaaaa|aaaaAaaa|.aaaaaat|.aaaaaaa|..aaaaaa|..aabbaa|...aabba|....aabb|....cc..|........",
+G:"........|....aaaa|...aaaaa|..aaaaaa|..aepaaa|..aaaaaa|..aaaamm|..aaaaaa|.aaaaaaa|.aaAaaaa|.aaaaaaa|.aaaaaaa|.aa.aaaa|..a..aa.|........|........",
+R:"........|....bbbb|....aAaa|...aepaa|....aaaa|..aaaaaa|.aaAaaaa|.aaaabaa|.aaaaabb|.aAaaaaa|.aaaaaaa|.bbaaaaa|..aaaabb|..aaaaaa|..bbbbbb|........",
+D:"...c....|...cc...|..aaaaaa|..aaaaaa|..aepaaa|..aaaaaa|..aatttt|b.aaaaaa|bbaaAaaa|bbbaaAaa|bbaaaaaa|.baaaaaa|..aaaabb|..aab.aa|..cc..cc|........",
+K:"........|......aa|....aaaa|...aaaaa|..aaAAaa|..aepaaa|..aaaaaa|..aaaamm|..aaaaaa|.a.a.a.a|.a.a.a.a|a..a..a.|a.a..a.a|.a.a.a..|........|........"};
+const HGL={helm:[0,"......cc|....bbbb|...bAAAA|...bbbbb"],wizard:[0,"......cc|.....ccc|....cccc|ccccgggg"],hood:[0,"....bbbb|...bbbbb|..bbbbbb|..bbkkkk"],halo:[0,"....gggg"],cap:[0,"......g.|....cccc|...ccccc|....hkkk"],hornhelm:[0,"..w.....|..wbbbbb|...bbbbb|...bkkkk"],hat:[1,"....cccc|cccccccc"],band:[1,"....hhhh|....hhhh|....cccc"],leaf:[0,"....g.g.|...gggg.|....hhhh"],skull:[2,"....wwww|....wwww|....wpww|....wwww|.....wmw"],lich:[0,"...g.g.g|...ggggg|....wwww|....wwww|....wpww|....wwww|.....wmw"],kabuto:[0,"...w....|....bbbb|...bAAAA|...bbbbb"],totem:[0,"...g.g.g|...cgcgc|...hhhhh"],ears:[1,"....kkkk|...kkkkk|..kkkkkk"],bald:[1,"....kkkk|....kkkk|....kkkk"],horns:[0,"..c.....|..cchhhh|...hhhhh"],crown:[0,"...g.g.g|...ggggg"]};
+const HELD={S:"..W.|..W.|..W.|..W.|..W.|..W.|..W.|..W.|.GGG|..O.|..O.|....",T:"..G.|.GGG|..G.|..O.|..O.|..O.|..O.|..O.|..O.|..O.|..O.|..O.",D:"....|....|....|....|....|..W.|..W.|.GGG|..O.|....|....|....",X:".WWO|WWW.|..O.|..O.|..O.|..O.|..O.|..O.|..O.|..O.|....|....",B:".OO.|O..W|O..W|O..W|O..W|O..W|O..W|O..W|O..W|O..W|.OO.|....",H:".OOO|.OOO|.OOO|..O.|..O.|..O.|..O.|..O.|..O.|..O.|....|....",G:"....|....|....|....|....|....|WWWW|WWOO|..O.|....|....|....",Y:"WWWW|W..W|...O|..O.|..O.|..O.|..O.|..O.|..O.|..O.|....|...."};
+const HCFG={g:["H","helm","S",["#7a8696","#a33333","#5a3a1a","#d4a017"]],m:["HR","wizard","T",["#3a4cb8","#6a3fc0","#cccccc","#6ee7ff"]],p:["H","hood","D",["#3a3a46","#7a2a2a","#222222","#c0c0c0"]],c:["HR","halo","H",["#e8e8f0","#e0b030","#b58a4a","#ffe27a"]],a:["H","cap","B",["#3a7a3a","#8a5a2a","#7a4a1a","#dd3333"]],q:["H","helm","S",["#c0c8d8","#2a5ac0","#c9a66b","#ffd23f"]],n:["HR","hood","Y",["#2a1a3a","#7a2aa0","#111111","#9bff6b"]],b:["H","hornhelm","X",["#8a3a1a","#5a2a10","#aa3333","#dddddd"]],i:["HR","totem","T",["#2a7a6a","#c08a30","#222222","#9bff6b"]],d:["HR","cap","D",["#f0f0f0","#dd3333","#5a3a1a","#77aadd"]],s:["H","hat","G",["#8a5a2a","#2a2a2a","#4a2a10","#d4a017"]],k:["H","band",null,["#d9822b","#aa3333","#222222","#ffd23f"]],r:["HR","leaf","T",["#4a7a2a","#8a5a2a","#7a4a1a","#6bff6b"]],u:["H","kabuto","S",["#a02a2a","#222222","#111111","#dddddd"]]};
+const ECFG={"Rata gigante":["Q",null,["#8a7a6a","#e8a0a0"]],"Lobo gris":["Q",null,["#7a808a","#dddddd"]],"Esqueleto":["H","skull",["#d8d4c0","#555555","#d8d4c0","#ff3333","#d8d4c0","#d8d4c0"]],"Araña gigante":["I",null,["#3a2a4a","#cc3333"]],"Goblin":["H","ears",["#6a4a2a","#3a2a1a","#2a4a1a","#dddd33","#6a9a3a"]],"Trol":["H","bald",["#5a4a3a","#3a2a1a","#222222","#dddd33","#6a8a5a"]],"Ogro":["H","horns",["#7a4a2a","#cc9933","#3a2a1a","#dddd33","#c08a5a"]],"Gran Lich":["HR","lich",["#3a1a5a","#7a2aa0","#222222","#ffd23f","#d8d4c0","#e8e4d0"]],
+"Murciélago vampiro":["W",null,["#5a3a6a","#cc3333"]],"Zombi":["H","bald",["#4a5a3a","#3a3a2a","#222222","#dddd33","#7a9a6a"]],"Bandido":["H","hood",["#5a4a3a","#aa3333","#222222","#dddddd","#f0c090"]],"Escorpión":["I",null,["#b8742a","#e8c070"]],"Minotauro":["H","horns",["#6a3a2a","#cc9933","#2a1a10","#dddddd","#8a5a3a"]],"Hechicero oscuro":["HR","wizard",["#2a1a4a","#7a2aa0","#bbbbbb","#ff66ff","#d8b090"]],"Hidra de tres cabezas":["K",null,["#3a8a4a","#cc3333"]],
+"Elemental de fuego":["F",null,["#ff6a2a","#ffd23f"]],"Elemental de hielo":["F",null,["#69d2ff","#e8f8ff"]],"Espectro":["G",null,["#b8c8e8","#7a8ab0"]],"Gólem de piedra":["R",null,["#8a8a8a","#6a6a6a"]],"Caballero maldito":["H","helm",["#3a3a4a","#7a2aa0","#222222","#ff3333","#999999"]],"Demonio":["H","horns",["#a02a2a","#3a1a1a","#2a0a0a","#ffcc33","#dd3333"]],"Señor de los demonios":["HR","horns",["#6a1a1a","#ffd23f","#2a0a0a","#ffcc33","#cc2222"]],
+"Wyvern":["W",null,["#4a8a4a","#c8a040"]],"Kraken joven":["K",null,["#4a4ab0","#8a8aff"]],"Fénix oscuro":["W",null,["#7a2aa0","#ff8a2a"]],"Guardián de cristal":["R",null,["#69d2ff","#e8f8ff"]],"Titán de piedra":["R",null,["#7a6a5a","#5a4a3a"]],"Ángel caído":["G",null,["#4a3a6a","#e8e8ff"]],"Dragón ancestral":["D",null,["#2a6ab0","#e8f8ff"]],"Slime":["B",null,["#4ac04a","#aaffaa"]]};
+// ---- más enemigos, jefes alternativos y dificultad ----
+const HPS=n=>(1+.17*(n-1)+.008*(n-1)*(n-1))*1.35,ATS=n=>1+.08*(n-1);
+EN[0].n.push(["Hongo venenoso","🍄",52,9,"fuego","nat",["pois","stun"]],["Cuervo carroñero","🐦",44,11,"rayo","osc",["multi","drain"]],["Cultista","🧑",58,10,"luz","osc",["drain","pois"]]);
+EN[0].e.push(["Orco brutal","👹",120,14,"hielo","nat",["heavy","rage","guard"]]);
+EN[0].b.push(["Reina Araña","🕷️",260,15,"fuego","nat",["stun","pois","multi","heal"]]);
+EN[1].n.push(["Momia","🧟",80,11,"fuego","osc",["pois","heavy"]],["Lagarto guerrero","🦎",72,13,"hielo","nat",["multi","rage"]],["Brujo del pantano","🧙",66,12,"luz","nat",["pois","drain","heal"]]);
+EN[1].e.push(["Golem de hierro","🤖",155,16,"rayo","hielo",["heavy","guard","stun"]]);
+EN[1].b.push(["Rey Esqueleto","💀",320,17,"luz","osc",["heavy","rage","drain","heal"]]);
+EN[2].n.push(["Hombre lobo","🐺",92,15,"luz","nat",["multi","rage"]],["Cangrejo de lava","🦀",98,13,"hielo","fuego",["guard","heavy"]],["Yeti","❄️",105,14,"fuego","hielo",["heavy","rage"]]);
+EN[2].e.push(["Quimera","🦁",170,19,"hielo","fuego",["heavy","multi","drain"]]);
+EN[2].b.push(["Emperatriz de hielo","👸",410,20,"fuego","hielo",["stun","guard","heal","multi"]]);
+EN[3].n.push(["Sombra viviente","👤",90,17,"luz","osc",["drain","stun"]],["Gárgola","🗿",115,15,"rayo","nat",["guard","heavy","multi"]],["Serpiente alada","🐍",100,16,"hielo","fuego",["pois","multi"]]);
+EN[3].e.push(["Verdugo","🪓",200,22,"luz","osc",["heavy","multi","rage","stun"]]);
+EN[3].b.push(["Devorador de mundos","🌌",520,24,"luz","osc",["heavy","multi","drain","rage"]]);
+Object.assign(ECFG,{"Hongo venenoso":["B",null,["#a05ad0","#f0e0f0"]],"Cuervo carroñero":["W",null,["#2a2a3a","#ffcc33"]],"Cultista":["HR","hood",["#6a1a1a","#222222","#222222","#ff6644","#d8b090"]],"Orco brutal":["H","horns",["#5a4a2a","#c8c0a0","#222222","#dddd33","#5a8a3a"]],"Reina Araña":["I",null,["#5a1a4a","#ff3366"]],
+"Momia":["H","bald",["#d8cfae","#8a7a5a","#d8cfae","#ff3333","#d8cfae"]],"Lagarto guerrero":["Q",null,["#4a8a3a","#c8d870"]],"Brujo del pantano":["HR","hood",["#3a5a3a","#7a4a2a","#222222","#9bff6b","#8ab070"]],"Golem de hierro":["R",null,["#9aa5b1","#5a6572"]],"Rey Esqueleto":["H","lich",["#6a5a2a","#ffd23f","#d8d4c0","#ffd23f","#d8d4c0","#d8d4c0"]],
+"Hombre lobo":["H","ears",["#6a6a7a","#3a3a4a","#444444","#ffdd33","#8a8a96"]],"Cangrejo de lava":["I",null,["#d04a1a","#ffcc33"]],"Yeti":["H","bald",["#e8f0f8","#9ab8d8","#e8f0f8","#66ccff","#c8dcf0"]],"Quimera":["D",null,["#c06a1a","#ffd23f"]],"Emperatriz de hielo":["HR","crown",["#69a8d8","#e8f8ff","#e8f8ff","#e8f8ff","#c8dcf0"]],
+"Sombra viviente":["G",null,["#2a2a3a","#9b4dff"]],"Gárgola":["R",null,["#5a6a8a","#3a4a6a"]],"Serpiente alada":["W",null,["#2a8a7a","#e8c070"]],"Verdugo":["H","helm",["#5a1a1a","#222222","#222222","#ff3333","#999999"]],"Devorador de mundos":["D",null,["#3a1a5a","#9b4dff"]]});
+const ICT={sw:"......aa|.....aAa|....aAa.|...aAa..|c.aAa...|.cAa....|..cc....|.b.c....",fl:"...a....|...aa...|..aaAa..|.aaAAAa.|.aAAcca.|.aAccca.|..aaaa..|........",sn:"...a....|.a.a.a..|..aAa...|aaAAAaa.|..aAa...|.a.a.a..|...a....|........",bo:"....aa..|...aaa..|..aaa...|.aaaaaa.|...aaa..|..aa....|..a.....|........",sp:"...a....|...a....|..aAa...|aaAAAaa.|..aAa...|...a....|...a....|........",mo:"..aaa...|.aA.....|aA......|aA......|aA......|.aA.....|..aaa...|........",le:"....aaa.|...aAaaa|..aAaaaa|.aAaaaa.|aaAaaa..|b.aaa...|b.......|........",ma:"a......a|aa....aa|.aaaaaa.|.aeaaea.|.aaaaaa.|.aaccaa.|..aaaa..|........",ba:"..aaaa..|...aa...|..aAAa..|.aAaaaa.|.aaaaaa.|.aacaaa.|..aaaa..|........",ca:"........|...c....|..ccc...|..cAc...|b.aaa.b.|.baaab..|bbbbbbb.|........",ch:"........|.aaaaaa.|aAAAAAAa|aaaccaaa|aaaccaaa|aaaaaaaa|abbbbbba|........",ha:"........|.aaaaa..|.aAAAaa.|.aaaaa..|...b....|...b....|...b....|..bbb...",db:"........|a......a|aa.bb.aa|aaabbbaa|aa.bb.aa|a......a|........|........",id:"..aaaa..|.aAaaaa.|.aeaaea.|.aaaaaa.|.aabbaa.|.aaaaaa.|..aaaa..|.aaaaaa."};
+const ICN={};[[EI.fis,"sw","#aab4bf","#b87333"],[EI.fuego,"fl","#ff6a2a","#ffd23f"],[EI.hielo,"sn","#69d2ff"],[EI.rayo,"bo","#ffe94a"],[EI.luz,"sp","#fff3a0"],[EI.osc,"mo","#9b4dff"],[EI.nat,"le","#4fdc5a"],[ND.eli[0],"ma","#cc3333"],[ND.mer[0],"ba","#b4733a","#e0b94a"],[ND.rep[0],"ca","#ff6a2a","#ffd23f","#6a3a1a"],[ND.rec[0],"ch","#b4733a","#e0b94a"],[ND.for[0],"ha","#aab4bf","#8a5a2b"],[ND.ent[0],"db","#9aa5b1","#444444"],[ND.alt[0],"id","#9a9a9a"]].forEach(x=>ICN[x[0]]=x.slice(1));
+const rev=r=>[...r].reverse().join(""),dk=c=>{const n=parseInt(c.slice(1),16);return"#"+[16,8,0].map(h=>Math.max(0,((n>>h)&255)-70).toString(16).padStart(2,"0")).join("")};
+function g16(T,hg,held){const R2=HALF[T].split("|").map(r=>r+rev(r));
+if(hg){const[st,a]=HGL[hg];a.split("|").forEach((r,i)=>{R2[st+i]=r+rev(r)})}
+if(held&&HELD[held])HELD[held].split("|").forEach((r,i)=>{const y=2+i;R2[y]=R2[y].slice(0,12)+[...r].map((c,j)=>c!="."?c:R2[y][12+j]).join("")});
+return R2}
+function spx(key,rows,col,N){if(!SP[key]){const n=N+2,c=document.createElement("canvas");c.width=c.height=n;const x=c.getContext("2d");
+const op=(i,j)=>i>=0&&j>=0&&i<N&&j<N&&rows[j][i]!="."&&col[rows[j][i]];
+for(let j=-1;j<=N;j++)for(let i=-1;i<=N;i++){if(op(i,j)){x.fillStyle=col[rows[j][i]];x.fillRect(i+1,j+1,1,1)}else if(op(i+1,j)||op(i-1,j)||op(i,j+1)||op(i,j-1)){x.fillStyle="#120a1c";x.fillRect(i+1,j+1,1,1)}}
+SP[key]=c.toDataURL()}return SP[key]}
+const pal2=p=>{const a=p[0],c=p[1]||a,g=p[3]||"#e0b030";return{a,A:lt(a),b:dk(a),c,C:lt(c),h:p[2]||"#442211",k:p[4]||"#f0c090",g,G:g,e:"#ffffff",p:"#111111",w:p[5]||"#e8e4d0",m:"#8a1a1a",t:"#ffffff",W:"#d8dde6",O:"#8a5a2b"}};
+const imgS=(src,z)=>'<img class="px" alt="" style="width:'+z+'px;height:'+z+'px" src="'+src+'">';
+function hs(k,z){const c=HCFG[k];if(!c)return fa0("🙂",z);return imgS(spx("h"+k,g16(c[0],c[1],c[2]),pal2(c[3]),16),z)}
+function es(n,z){n=String(n).replace(/ [A-D]$/,"");const c=ECFG[n];if(!c)return fa0("👾",z);return imgS(spx("e"+n,g16(c[0],c[1],c[3]),pal2(c[2]),16),z)}
+function icon(e,z){const c=ICN[e],pl={a:c[1],A:lt(c[1]),c:c[2]||c[1],b:c[3]||dk(c[1]),e:"#ffffff"};return imgS(spx("i"+e,ICT[c[0]].split("|"),pl,8),z)}
+function fa(e,z){return ICN[e]?icon(e,z):fa0(e,z)}
+const qic=x=>{const q=x.k=="p"?roster().find(z=>z.peer==x.i):null;return x.k=="e"?es(x.n,28):q?hs(q.presence.c,28):fa0(x.e,28)};
+// ---- idiomas: español (base) e inglés ----
+let LANG="es";try{LANG=localStorage.getItem("senda-lang")||((navigator.language||"es").toLowerCase().startsWith("es")?"es":"en")}catch(e){}
+const ANE={Coraza:"Cuirass",Túnica:"Tunic",Capa:"Cloak",Vestidura:"Vestment",Casaca:"Jacket",Armadura:"Armor",Mortaja:"Shroud",Piel:"Hide",Estola:"Stole",Bata:"Robe",Chaqueta:"Jacket",Faja:"Sash",Vestimenta:"Garb"},AJE={"de cuero":"Leather","de bronce":"Bronze",reforzada:"Reinforced","de hierro":"Iron","de acero":"Steel",rúnica:"Runic","de plata":"Silver",encantada:"Enchanted","de mithril":"Mithril",ancestral:"Ancestral","de dragón":"Dragon",legendaria:"Legendary"};
+const ARR=new RegExp("("+Object.keys(ANE).join("|")+") ("+Object.keys(AJE).join("|")+")","g");
+const DICT=`La senda del héroe=The Hero's Path
+40 combates · 14 clases · 4 jefes=40 battles · 14 classes · 4 bosses
+Récord: combate=Best: battle
+▶ Un jugador=▶ Single player
+Elige tu clase y baja a la mazmorra.=Pick your class and descend into the dungeon.
+👥 Multijugador=👥 Multiplayer
+Multijugador=Multiplayer
+Cooperativo en línea, de 1 a 4 jugadores.=Online co-op for 1 to 4 players.
+Cooperativo de 1 a 4. Más jugadores, más difícil.=Co-op for 1 to 4. More players, harder.
+🔄 Volver a la sala=🔄 Rejoin room
+Retoma tu partida donde la dejaste.=Resume your game where you left off.
+? Cómo jugar=? How to play
+Cómo jugar=How to play
+Las reglas en pocas líneas.=The rules in a few lines.
+• Avanza por 40 combates. Hay jefes en el 10, 20, 30 y 40.=• Fight through 40 battles. Bosses appear at 10, 20, 30 and 40.
+• Tras cada combate eliges 1 de 3 caminos al azar.=• After each battle you pick 1 of 3 random paths.
+• Cada nivel da 3 puntos de estadística y 1 de habilidad (2 desde el segundo jefe).=• Each level gives 3 stat points and 1 skill point (2 after the second boss).
+• Cada clase tiene 24 habilidades, pero llevas solo 4 al combate.=• Each class has 24 skills, but you bring only 4 into battle.
+• Armas y armaduras son de una clase: solo ella puede usarlas.=• Weapons and armor belong to one class: only that class can use them.
+• Mejora tu arma en la forja con oro y piedras de afilar.=• Upgrade your weapon at the forge with gold and whetstones.
+• Ataca al punto débil del enemigo para hacer más daño.=• Hit the enemy's weak point for extra damage.
+Elige tu clase=Choose your class
+Cada partida es distinta.=Every run is different.
+Magia:=Magic:
+Volver al menú=Back to menu
+Volver=Back
+Elige tu arma inicial.=Choose your starting weapon.
+Poder=Power
+~· Usa~=~· Uses~
+Reliquia=Relic
+Elige una. Dura toda la partida.=Pick one. It lasts the whole run.
+Guerrero=Warrior
+Mago=Mage
+Pícaro=Rogue
+Clérigo=Cleric
+Arquero=Archer
+Paladín=Paladin
+Nigromante=Necromancer
+Invocador=Summoner
+Médico=Medic
+Pistolero=Gunslinger
+Monje=Monk
+Druida=Druid
+Samurái=Samurai
+Fuerte y resistente.=Strong and sturdy.
+Maná y daño elemental. Frágil.=Mana and elemental damage. Fragile.
+Rápido, con críticos y esquivas.=Fast, with crits and dodges.
+Cura y castiga con luz.=Heals and smites with light.
+Daño a distancia con Agilidad.=Ranged damage using Agility.
+El más defensivo.=The most defensive.
+Roba vida y maldice.=Drains life and curses.
+Golpea fuerte pagando con vida.=Hits hard, paying with health.
+Convoca aliados que atacan solos.=Summons allies that attack on their own.
+Cura y envenena. Resistente.=Heals and poisons. Sturdy.
+Su daño depende de la Suerte.=Its damage depends on Luck.
+Puños veloces y aturdimiento.=Swift fists and stuns.
+Magia de la naturaleza y curación.=Nature magic and healing.
+Duelista de golpes críticos.=Duelist of critical strikes.
+Fuerza=Strength
+Magia=Magic
+Agilidad=Agility
+Vitalidad=Vitality
+Defensa total=Total defense
+Defensa=Defense
+Suerte=Luck
+FUE=STR
+SUE=LCK
+Anillo de vida=Ring of Life
++25 de vida máxima=+25 max health
+Gema de maná=Mana Gem
++20 de maná máximo=+20 max mana
+Bolsa sin fondo=Bottomless Bag
++30% de oro=+30% gold
+Garra de fiera=Beast Claw
++15% de daño=+15% damage
+Escudo de roble=Oak Shield
++4 Defensa=+4 Defense
+Trébol de cuatro hojas=Four-Leaf Clover
++4 Suerte=+4 Luck
+Botas ligeras=Light Boots
++4 Agilidad=+4 Agility
+Cristal arcano=Arcane Crystal
++4 Magia=+4 Magic
+Colmillo de lobo=Wolf Fang
++4 Fuerza=+4 Strength
+Corazón de piedra=Stone Heart
++4 Vitalidad=+4 Vitality
+Sanguijuela=Leech
+Recuperas 10% del daño que causas=Recover 10% of the damage you deal
+Frascos sin fondo=Endless Flasks
++3 pociones de cada tipo=+3 potions of each kind
+Libro antiguo=Ancient Book
++3 puntos de habilidad=+3 skill points
+Piedras de afilar=Whetstones
++3 piedras de afilar=+3 whetstones
+Combate de élite=Elite battle
+Más difícil, mejor botín.=Harder, better loot.
+Batalla=Battle
+Un enemigo común.=A common enemy.
+Compra y vende.=Buy and sell.
+Recuperas 50% de vida y todo el maná.=Recover 50% health and all mana.
+Reposo=Rest
+Oro y objetos.=Gold and items.
+Recompensa=Reward
+Mejora tu arma con oro y piedras.=Upgrade your weapon with gold and stones.
+Entrenamiento=Training
++2 puntos de estadística.=+2 stat points.
+Altar misterioso=Mysterious altar
+Pierdes 12 de vida y ganas 4 puntos.=Lose 12 health and gain 4 points.
+Camino=Path
+Descanso=Rest
+¡El siguiente combate es contra un jefe!=The next battle is against a boss!
+Elige tu próximo paso:=Choose your next step:
+Personaje=Character
+Nivel=Level
+nivel(es) mientras no estabas.=level(s) while you were away.
+nivel=level
+puntos de estadística=stat points
+Puntos de habilidad:=Skill points:
+Habilidad:=Skill:
+Habilidades=Skills
+Equipo=Equipment
+Tu mochila=Your backpack
+Mochila=Backpack
+Toca un objeto para ver sus datos.=Tap an item to see its details.
+Árbol de habilidades=Skill tree
+Árbol=Tree
+Detalle=Details
+Equipar en combate=Equip for battle
+Quitar del combate=Remove from battle
+Equipada=Equipped
+Equipar=Equip
+Aprendida=Learned
+Aprender (=Learn (
+RAMA A=BRANCH A
+RAMA B=BRANCH B
+🟩 aprendida · 🟨 disponible · ⬜ bloqueada. Cada habilidad pide la de arriba en su misma columna.=🟩 learned · 🟨 available · ⬜ locked. Each skill needs the one above it in the same column.
+Solo estas 4 se usan en combate.=Only these 4 are used in battle.
+Toca una habilidad del árbol.=Tap a skill in the tree.
+En combate (=In battle (
+🔒 Requiere:=🔒 Requires:
+Requiere nivel=Requires level
+Requiere=Requires
+(tienes=(you have
+Solo para=Only for
+Sala=Room
+(poder=(power
+(defensa +=(defense +
+, vida +=, health +
+(para=(for
+Objeto:=Item:
+Botín:=Loot:
+Tu parte del botín: +=Your share of the loot: +
+de oro. Nivel=gold. Level
+(+3 puntos y +1 de habilidad).=(+3 points and +1 skill point).
+(+3 puntos y +2 de habilidad).=(+3 points and +2 skill points).
+Un jefe suelta 2 piedras de afilar.=A boss drops 2 whetstones.
++2 piedras de afilar.=+2 whetstones.
++1 piedra de afilar.=+1 whetstone.
+Encuentras una piedra de afilar.=You find a whetstone.
+Encuentras=You find
+de oro y 2 piedras de afilar.=gold and 2 whetstones.
+de oro y=gold and
++1 de maná=+1 mana
++3 de maná=+3 mana
+de maná=mana
+Maná=Mana
+de vida=health
+Vida=Health
+Atacar=Attack
+Defender=Defend
+Poción de vida ×=Health potion ×
+Poción de maná ×=Mana potion ×
+Poción de vida=Health potion
+Poción de maná=Mana potion
+quedan=left:
+Revivir aliado=Revive ally
+· Débil:=· Weak:
+Débil:=Weak:
+Resiste:=Resists:
+Vel =Spd 
+Tu maná=Your mana
+Orden por velocidad (el número es la velocidad)=Turn order by speed (the number is the speed)
+🎯 ¡Es tu turno!=🎯 It's your turn!
+⏳ Turno de=⏳ Turn of
+💀 Estás caído=💀 You are down
+Grupo=Party
+Aparece=Here comes
+(jefe)=(boss)
+(élite)=(elite)
+¡Jefe!=Boss!
+¡Élite!=Elite!
+¡Horda!=Horde!
+jugadores)=players)
+· Jefe=· Boss
+· Élite=· Elite
+Atacas y causas=You attack and deal
+¡Crítico!=Critical!
+(¡crítico!)=(critical!)
+¡crítico!=critical!
+¡Punto débil!=Weak point!
+(resiste)=(resists)
+(afinidad)=(affinity)
+(arma opuesta)=(opposed weapon)
+Te cubres y recuperas 3 de maná.=You brace yourself and recover 3 mana.
+Bebes una poción de maná: +=You drink a mana potion: +
+Bebes una poción: +=You drink a potion: +
+Envenenas a=You poison
+de daño por turno durante 3 turnos.=damage per turn for 3 turns.
+de daño por turno)=damage per turn)
+de daño=damage
+Turno de=Turn of
+Invocas a=You summon
+durante=for
+turnos.=turns.
+turnos=turns
+Tu próximo ataque hará el doble de daño.=Your next attack will deal double damage.
+Un escudo divino reduce a la mitad el daño durante 2 turnos.=A divine shield halves damage for 2 turns.
+Curas=You heal
+Robas=You steal
+El veneno causa=Poison deals
+El veneno te causa=Poison deals you
+está aturdido y pierde el turno.=is stunned and loses its turn.
+está aturdido.=is stunned.
+¡Esquivas el ataque de=You dodge the attack from
+~usa~=~uses~
+~te ataca=~attacks you
+~ataca a~=~attacks~
+~ataca:=~attacks:
+~cae envenenado.=~collapses from poison.
+~cae.=~falls.
+~revive a~=~revives~
+~cura a~=~heals~
+~se cura (+=~heals (+
+~bebe una poción de maná.=~drinks a mana potion.
+~bebe una poción.=~drinks a potion.
+~se defiende.=~defends.
+~se enfurece.=~goes berserk.
+~levanta un escudo.=~raises a shield.
+~invoca a~=~summons~
+~envenena a~=~poisons~
+~pierde el turno.=~loses the turn.
+~está paralizado.=~is paralyzed.
+adopta una postura defensiva: recibe la mitad de daño.=takes a defensive stance: takes half damage.
+adopta una postura defensiva.=takes a defensive stance.
+: su ataque aumenta.=: its attack increases.
+~desaparece.=~vanishes.
+~sufre veneno (=~suffers poison (
+¡Estás envenenado! (=You are poisoned! (
+¡Quedas paralizado y pierdes el turno!=You are paralyzed and lose your turn!
+~ofrece:=~offers:
+~ofrece~=~offers~
+~te dio~=~gave you~
+Diste=You gave
+Intercambiaste=You traded
+Volviste a la partida: subiste=You rejoined the game: you gained
+Volviste a la partida.=You rejoined the game.
+rechazó el intercambio.=declined the trade.
+Se canceló el intercambio.=The trade was canceled.
+Ofreces=You offer
+Te ofrecen un intercambio=You are offered a trade
+Intercambio=Trade
+Intercambiar=Trade
+Dar a...=Give to...
+Elige qué darle a cambio:=Choose what to give in return:
+Tú ofreciste=You offered
+Esperando respuesta...=Waiting for a response...
+. Esperando confirmación...=. Waiting for confirmation...
+Aceptar=Accept
+Rechazar=Decline
+Cancelar=Cancel
+¿A quién se lo das?=Who do you give it to?
+¿Con quién intercambias?=Who do you trade with?
+Tienda del grupo=Party shop
+Objetos al azar de cualquier clase. Si no sirven para ti, dáselos o intercámbialos con un compañero.=Random items of any class. If they're no use to you, give or trade them to a teammate.
+Amuleto: +1=Amulet: +1
+Piedra de afilar=Whetstone
+Vender ·=Sell ·
+Vender=Sell
+Comprar=Buy
+Mercader=Merchant
+Abriendo la tienda...=Opening the shop...
+🛒 ¡Tu turno de comprar!=🛒 Your turn to shop!
+🛒 Compra:=🛒 Shopping:
+🛒 La tienda cerró. Esperando al grupo...=🛒 The shop closed. Waiting for the party...
+Terminar mi turno=End my turn
+Toca un objeto. Solo puedes vender en tu turno.=Tap an item. You can only sell on your turn.
+Toca un objeto de tu mochila.=Tap an item in your backpack.
+Forja=Forge
+Mejoras:=Upgrades:
+Al máximo.=Maxed out.
+Siguiente: +2 de poder por=Next: +2 power for
+piedra(s) de afilar.=whetstone(s).
+Mejorar arma=Upgrade weapon
+Preparativos=Preparations
+Iniciar combate=Start battle
+(forzar)=(force)
+Esperando al anfitrión...=Waiting for the host...
+Estoy listo=I'm ready
+Seguir=Continue
+Listo ✔=Ready ✔
+Listo=Ready
+Eligiendo...=Choosing...
+Votación=Voting
+Voten el próximo paso. Si hay empate, decide el anfitrión 👑.=Vote on the next step. If there's a tie, the host 👑 decides.
+Han votado=Votes cast:
+voto(s)=vote(s)
+Cerrar votación ya=Close voting now
+Eligen:=They choose:
+Comenzar partida=Start game
+Crear sala=Create room
+Unirme a la sala=Join room
+Tu nombre=Your name
+Código de sala=Room code
+Jugadores (=Players (
+Eres el anfitrión. Pasa el código a tus amigos.=You are the host. Share the code with your friends.
+Esperando a que el anfitrión comience...=Waiting for the host to start...
+Serás el anfitrión y recibirás un código.=You will be the host and get a code.
+Héroe=Hero
+Salir=Leave
+Menú=Menu
+Jugar otra vez=Play again
+Derrota=Defeat
+¡Victoria! Has vencido a=Victory! You defeated
+y terminado la senda. Oro final:=and finished the path. Final gold:
+¡Victoria!=Victory!
+Llegaron al combate=Reached battle
+Premios=Awards
+Tabla=Table
+🗡️ Más daño causado=🗡️ Most damage dealt
+🛡️ Más daño recibido=🛡️ Most damage taken
+💚 Más curación=💚 Most healing
+💰 Más oro gastado=💰 Most gold spent
+🔷 Más maná gastado=🔷 Most mana spent
+✨ Más revivios=✨ Most revives
+Has caído en el combate=You fell in battle
+El grupo ha caído.=The party has fallen.
+¡Derrotas a=You defeat
+¡Combate=Battle
+superado!=cleared!
+Combate=Battle
+combate=battle
+Descansas junto al fuego: recuperas vida y todo el maná.=You rest by the fire: you recover health and all mana.
+Entrenas duro: +2 puntos de estadística.=You train hard: +2 stat points.
+El altar toma 12 de vida y te concede 4 puntos de estadística.=The altar takes 12 health and grants you 4 stat points.
+¡Elige una reliquia!=Choose a relic!
+El anfitrión no volvió a la sala.=The host did not return to the room.
+El multijugador no está disponible en esta vista.=Multiplayer is not available in this view.
+No pude entrar a la sala.=Couldn't join the room.
+La partida ya empezó. Pide al anfitrión una sala nueva.=The game has already started. Ask the host for a new room.
+⚠️ Sin conexión con el anfitrión. Esperando a que vuelva...=⚠️ Lost connection to the host. Waiting for them to return...
+Daño ×=Damage ×
+~y aturde=~and stuns
+~y roba vida=~and steals life
+Cura (Magia ×=Heals (Magic ×
+Próximo ataque ×2=Next attack ×2
+Veneno 3 turnos=Poison 3 turns
+Mitad de daño 2 turnos=Half damage 2 turns
+Aliado=Ally
+Aturdido.=Stunned.
+Golpe aplastante=Crushing Blow
+Mordisco venenoso=Venomous Bite
+Mirada paralizante=Paralyzing Gaze
+Succión vital=Life Drain
+Succión vital=Life Drain
+Regeneración=Regeneration
+Rugido furioso=Furious Roar
+Postura defensiva=Defensive Stance
+Doble ataque=Double Attack
+Rata gigante=Giant Rat
+Lobo gris=Gray Wolf
+Esqueleto=Skeleton
+Araña gigante=Giant Spider
+Trol=Troll
+Ogro=Ogre
+Gran Lich=Great Lich
+Murciélago vampiro=Vampire Bat
+Zombi=Zombie
+Bandido=Bandit
+Escorpión=Scorpion
+Minotauro=Minotaur
+Hechicero oscuro=Dark Sorcerer
+Hidra de tres cabezas=Three-Headed Hydra
+Elemental de fuego=Fire Elemental
+Elemental de hielo=Ice Elemental
+Espectro=Specter
+Gólem de piedra=Stone Golem
+Caballero maldito=Cursed Knight
+Demonio=Demon
+Señor de los demonios=Demon Lord
+Kraken joven=Young Kraken
+Fénix oscuro=Dark Phoenix
+Guardián de cristal=Crystal Guardian
+Titán de piedra=Stone Titan
+Ángel caído=Fallen Angel
+Dragón ancestral=Ancient Dragon
+Golpe brutal=Brutal Strike
+Grito de guerra=War Cry
+Remate=Finisher
+Muro de escudos=Shield Wall
+Furia del titán=Titan's Fury
+Tormenta de acero=Steel Storm
+Bola de fuego=Fireball
+Congelar=Freeze
+Tormenta de espinas=Thorn Storm
+Tormenta=Storm
+Lanza de hielo=Ice Lance
+Meteoro=Meteor
+Cadena de rayos=Chain Lightning
+Golpe certero=True Strike
+Veneno=Poison
+Lluvia de cuchillos=Knife Rain
+Sombra veloz=Swift Shadow
+Ejecución=Execution
+Danza mortal=Deadly Dance
+Luz sagrada=Holy Light
+Curar=Heal
+Juicio divino=Divine Judgment
+Escudo sagrado=Holy Shield
+Resplandor=Radiance
+Milagro=Miracle
+Disparo preciso=Precise Shot
+Trampa=Trap
+Lluvia de flechas=Arrow Rain
+Flecha de fuego=Fire Arrow
+Disparo mortal=Deadly Shot
+Aguacero de flechas=Arrow Downpour
+Golpe sagrado=Holy Strike
+Escudo divino=Divine Shield
+Castigo=Smite
+Plegaria=Prayer
+Martillo divino=Divine Hammer
+Muro sagrado=Sacred Wall
+Drenar vida=Drain Life
+Maldición=Curse
+Plaga de almas=Soul Plague
+Rayo sombrío=Shadow Bolt
+Eclipse=Eclipse
+Pacto de muerte=Death Pact
+Tajo salvaje=Savage Slash
+Furia sangrienta=Bloody Fury
+Sed de sangre=Bloodlust
+Rugido=Roar
+Masacre=Massacre
+Frenesí eterno=Eternal Frenzy
+Lobo espectral=Spectral Wolf
+Gólem de piedra=Stone Golem
+Espíritu de hielo=Ice Spirit
+Fénix=Phoenix
+Titán abisal=Abyssal Titan
+Primeros auxilios=First Aid
+Pócima tóxica=Toxic Potion
+Cirugía=Surgery
+Dardo sedante=Sedative Dart
+Transfusión=Transfusion
+Resurrección=Resurrection
+Disparo rápido=Quick Shot
+Tiro a la cabeza=Headshot
+Lluvia de plomo=Lead Rain
+Ráfaga de golpes=Flurry of Blows
+Ráfaga=Burst
+Bala de plata=Silver Bullet
+Gran jugada=Big Play
+Puño de trueno=Thunder Fist
+Palma aturdidora=Stunning Palm
+Meditación=Meditation
+Dragón ascendente=Rising Dragon
+Mil puños=Thousand Fists
+Espinas=Thorns
+Savia curativa=Healing Sap
+Ira del bosque=Forest Wrath
+Enredaderas=Vines
+Renacer=Rebirth
+Corte rápido=Quick Slash
+Postura de duelo=Duel Stance
+Iaido=Iaido
+Contraataque=Counterattack
+Corte de luna=Moon Slash
+Última espada=Final Blade
+Corte=Slash
+Llamarada=Blaze
+Escarcha=Frost
+Descarga=Shock
+Destello=Flash
+Sombra=Shadow
+Espina=Thorn
+Aturdir=Stun
+Toxina=Toxin
+Succión=Drain
+Succión=Drain
+Sanación=Healing
+Baluarte=Bulwark
+Furia=Fury
+Invocación=Summoning
+Espada=Sword
+Hacha=Axe
+Bastón=Staff
+Cetro=Scepter
+Daga=Dagger
+Estoque=Rapier
+Báculo=Rod
+Maza=Mace
+Arco=Bow
+Ballesta=Crossbow
+Martillo=Hammer
+Guadaña=Scythe
+Cadenas=Chains
+Tótem=Totem
+Bisturí=Scalpel
+Jeringa=Syringe
+Revólver=Revolver
+Pistolas=Pistols
+Guantes=Gloves
+1 enemigo=1 enemy
+Todos los enemigos=All enemies
+1 aliado a elegir=1 ally of your choice
+A ti mismo=Self
+(salpica=(splash
++crítico=+crit
+~golpes ×=~hits ×
+~si queda poca vida)=~if low health)
+ignora defensas=ignores defenses
+aturde=stuns
+envenena=poisons
+sangrado=bleeding
+quemadura=burn
+debilita (−30% ataque)=weakens (−30% attack)
+ralentiza=slows
+vulnerable (+30% daño)=vulnerable (+30% damage)
+cura (Magia ×=heals (Magic ×
+~y revive=~and revives
+regenera=regenerates
+escudo=shield
++25% daño=+25% damage
+purifica=cleanses
+mitad de daño 2 turnos=half damage for 2 turns
+próximo ataque ×2=next attack ×2
+aliado=ally
+recupera maná=restores mana
+~· Área=~· Area
+Toca un enemigo (ataques) o un aliado (curas y apoyos). Objetivo de curas:=Tap an enemy (attacks) or an ally (heals and support). Heal target:
+enemigos=enemies
+~→ todo el grupo=~→ the whole party
+~→ ti=~→ you
+sufre daño continuo (=suffers damage over time (
+está ralentizado y pierde el turno.=is slowed and loses its turn.
+aturdido=stunned
+envenenado=poisoned
+herida abierta=open wound
+debilitado=weakened
+ralentizado=slowed
+Golpe doble=Double Strike
+Triple golpe=Triple Strike
+Ejecutor=Executioner
+Perforar=Pierce
+Tajo sangrante=Bleeding Slash
+Quemadura=Burn
+Golpe debilitante=Weakening Blow
+Golpe ralentizador=Slowing Blow
+Marca de vulnerabilidad=Mark of Vulnerability
+Golpe vampírico=Vampiric Strike
+Impacto aturdidor=Stunning Impact
+Toque venenoso=Venomous Touch
+Estocada crítica=Critical Thrust
+Salpicadura=Splash
+Barrido=Sweep
+Onda expansiva=Shockwave
+Aluvión=Barrage
+Nube tóxica=Toxic Cloud
+Lluvia ardiente=Burning Rain
+Grito aterrador=Terrifying Cry
+Campo ralentizador=Slowing Field
+Cadena mortal=Deadly Chain
+Resplandor abrasador=Searing Glare
+Sanar=Mend
+Escudo protector=Protective Shield
+Bendición=Blessing
+Purificar=Purify
+Luz curativa=Healing Light
+Aura protectora=Protective Aura
+Himno de guerra=War Hymn
+Rocío vital=Vital Dew
+Renovación=Renewal
+Resurgir=Resurge
+Concentración=Focus
+Guardia férrea=Iron Guard
+Frenesí=Frenzy
+Espectro aliado=Ally Specter
+Bestia invocada=Summoned Beast
+Elemental menor=Lesser Elemental
+Centinela=Sentinel
+Hongo venenoso=Poison Mushroom
+Cuervo carroñero=Scavenger Crow
+Cultista=Cultist
+Orco brutal=Brutal Orc
+Reina Araña=Spider Queen
+Momia=Mummy
+Lagarto guerrero=Lizard Warrior
+Brujo del pantano=Swamp Warlock
+Golem de hierro=Iron Golem
+Rey Esqueleto=Skeleton King
+Hombre lobo=Werewolf
+Cangrejo de lava=Lava Crab
+Yeti=Yeti
+Quimera=Chimera
+Emperatriz de hielo=Ice Empress
+Sombra viviente=Living Shadow
+Gárgola=Gargoyle
+Serpiente alada=Winged Serpent
+Verdugo=Executioner
+Devorador de mundos=World Devourer
+Sombra servil=Servile Shadow`;
+const DIC=DICT.split("\n").filter(x=>x.includes("=")).map(x=>{const i=x.indexOf("="),f=t=>t.replace(/^~/," ").replace(/~$/," ");return[f(x.slice(0,i)),f(x.slice(i+1))]}).sort((a,b)=>b[0].length-a[0].length);
+function Ltxt(t){t=t.replace(ARR,(m,n,a)=>AJE[a]+" "+ANE[n]);for(const[e,n]of DIC)if(t.includes(e))t=t.split(e).join(n);return t.replace(/(uses [^.:]*?) a (?=[A-Z])/g,"$1 on ").replace(/(\d+) de (\d+)/g,"$1 of $2")}
+function trDom(){if(LANG!="en"||!document.createTreeWalker)return;const w=document.createTreeWalker($("app"),4);let n;while(n=w.nextNode()){const v=n.nodeValue;if(/[a-záéíóúñ¡¿]/i.test(v)){const r=Ltxt(v);if(r!==v)n.nodeValue=r}}}
+function setLang(){LANG=LANG=="es"?"en":"es";try{localStorage.setItem("senda-lang",LANG)}catch(e){}applyLang();draw()}
+function applyLang(){const b=$("lang");if(b)b.textContent=LANG.toUpperCase();try{document.documentElement.lang=LANG;document.title=LANG=="en"?"The Hero's Path":"La senda del héroe"}catch(e){}}
+applyLang();
+function draw(){draw0();if(M&&M.rm&&scr!="menu"){const b=tradeUI(),a=$("app");if(b&&a&&a.insertAdjacentHTML)a.insertAdjacentHTML("afterbegin",b)}trDom()}
 function draw0(){
 const A=$("app");
-if(scr=="menu"){if(M){try{M.rm&&M.rm.leave();clearInterval(M.iv)}catch(e){}M=null;clearSv()}A.innerHTML='<div style="display:flex;justify-content:center;padding:26px 0 8px">'+fa("⚔️",112)+'</div><h1 style="text-align:center;font-size:30px">La senda del héroe</h1><p class="sub" style="text-align:center">40 combates · 14 clases · 4 jefes</p><div class="card" style="text-align:center">Récord: combate <b>'+rec()+'</b> de 40</div><button class="pick" onclick="go(\'pick\')"><h2>▶ Un jugador</h2>Elige tu clase y baja a la mazmorra.</button><button class="pick" onclick="go(\'mp\')"><h2>👥 Multijugador</h2>Cooperativo en línea, de 1 a 4 jugadores.</button>'+(ld()?'<button class="pick" onclick="mResume()"><h2>🔄 Volver a la sala '+ld().code+'</h2>Retoma tu partida donde la dejaste.</button>':'')+'<button class="pick" onclick="go(\'help\')"><h2>? Cómo jugar</h2>Las reglas en pocas líneas.</button>';return}
-if(scr=="help"){A.innerHTML='<h1>Cómo jugar</h1><div class="card">• Avanza por 40 combates. Hay jefes en el 10, 20, 30 y 40.<br>• Tras cada combate eliges 1 de 3 caminos al azar.<br>• Cada nivel da 3 puntos de estadística y 1 de habilidad.<br>• Cada clase tiene 24 habilidades, pero llevas solo 4 al combate.<br>• Armas y armaduras son de una clase: solo ella puede usarlas.<br>• Mejora tu arma en la forja con oro y piedras de afilar.<br>• Ataca al punto débil del enemigo para hacer más daño.</div><button style="width:100%" onclick="go(\'menu\')">Volver</button>';return}
-if(scr=="pick"){A.innerHTML='<h1>Elige tu clase</h1><p class="sub">Cada partida es distinta.</p>'+Object.keys(CL).map(k=>{const c=CL[k];return '<button class="pick" onclick="pickC(\''+k+'\')"><div class="row">'+fa(c.e,44)+'<div><h2>'+c.n+'</h2>'+c.d+'</div></div>'+stl(c.st)+'<div class="num">Magia: '+[...new Set(c.sk.map(x=>EI[x.e]))].join(' ')+'</div></button>'}).join('')+'<button class="pick" onclick="go(\'menu\')">Volver al menú</button>';return}
+if(scr=="menu"){if(M){try{M.rm&&M.rm.leave();clearInterval(M.iv)}catch(e){}M=null;clearSv()}A.innerHTML='<div style="display:flex;justify-content:center;padding:26px 0 8px">'+hs("g",112)+'</div><h1 style="text-align:center;font-size:30px">La senda del héroe</h1><p class="sub" style="text-align:center">40 combates · 14 clases · 4 jefes</p><div class="card" style="text-align:center">Récord: combate <b>'+rec()+'</b> de 40</div><button class="pick" onclick="go(\'pick\')"><h2>▶ Un jugador</h2>Elige tu clase y baja a la mazmorra.</button><button class="pick" onclick="go(\'mp\')"><h2>👥 Multijugador</h2>Cooperativo en línea, de 1 a 4 jugadores.</button>'+(ld()?'<button class="pick" onclick="mResume()"><h2>🔄 Volver a la sala '+ld().code+'</h2>Retoma tu partida donde la dejaste.</button>':'')+'<button class="pick" onclick="go(\'help\')"><h2>? Cómo jugar</h2>Las reglas en pocas líneas.</button>';return}
+if(scr=="help"){A.innerHTML='<h1>Cómo jugar</h1><div class="card">• Avanza por 40 combates. Hay jefes en el 10, 20, 30 y 40.<br>• Tras cada combate eliges 1 de 3 caminos al azar.<br>• Cada nivel da 3 puntos de estadística y 1 de habilidad (2 desde el segundo jefe).<br>• Cada clase tiene 24 habilidades, pero llevas solo 4 al combate.<br>• Armas y armaduras son de una clase: solo ella puede usarlas.<br>• Mejora tu arma en la forja con oro y piedras de afilar.<br>• Ataca al punto débil del enemigo para hacer más daño.</div><button style="width:100%" onclick="go(\'menu\')">Volver</button>';return}
+if(scr=="pick"){A.innerHTML='<h1>Elige tu clase</h1><p class="sub">Cada partida es distinta.</p>'+Object.keys(CL).map(k=>{const c=CL[k];return '<button class="pick" onclick="pickC(\''+k+'\')"><div class="row">'+hs(k,44)+'<div><h2>'+c.n+'</h2>'+c.d+'</div></div>'+stl(c.st)+'<div class="num">Magia: '+[...new Set(c.sk.map(x=>EI[x.e]))].join(' ')+'</div></button>'}).join('')+'<button class="pick" onclick="go(\'menu\')">Volver al menú</button>';return}
 if(scr=="weapon"){const C=CL[tmp];A.innerHTML='<h1>'+C.n+'</h1><p class="sub">Elige tu arma inicial.</p>'+TW.map((w,i)=>'<button class="pick" onclick="pickW('+i+')"><div class="row">'+IC(w,48)+'<div><h2>'+w[0]+'</h2>Poder '+w[1]+' · Usa '+TN[w[2]]+'</div></div></button>').join('')+'<button class="pick" onclick="go(\'pick\')">Volver</button>';return}
 if(scr=="relic"){A.innerHTML='<h1>Reliquia</h1><p class="sub">Elige una. Dura toda la partida.</p>'+RP.map((r,i)=>'<button class="pick" onclick="relic('+i+')"><h2>'+RL[r][0]+'</h2>'+RL[r][1]+'</button>').join('');return}
 if(scr=="map"){A.innerHTML=hd("Camino")+'<div class="card">'+MSG+((P.f+1)%10==0?'<br><span class="tag">¡El siguiente combate es contra un jefe!</span>':'')+'</div><p class="sub">Elige tu próximo paso:</p>'+OPTS.map(k=>'<button class="pick" onclick="node(\''+k+'\')"><div class="row">'+fa(ND[k][0],40)+'<div><h2>'+ND[k][1]+'</h2>'+ND[k][2]+'</div></div></button>').join('')+pb().replace('<button','<button style="width:100%"')+(M?'<button style="width:100%;margin-top:12px" onclick="mReady()">Estoy listo</button>':'');return}
@@ -457,25 +1241,25 @@ A.innerHTML=hd("Habilidades")+'<p class="sub">Puntos de habilidad: <b>'+P.sp+'</
 if(scr=="inv"){const it=SEL!=null?P.inv[SEL]:null;A.innerHTML=hd("Personaje")+'<p class="sub">Nivel '+P.lvl+(P.pts?' · <span class="tag">'+P.pts+' puntos de estadística</span>':'')+' · Habilidad: <b>'+P.sp+'</b></p><div class="card">'+P.st.map((v,i)=>'<div class="srow"><span>'+SN[i]+' <b>'+v+'</b></span>'+(P.pts?'<button class="sm" onclick="add('+i+')">+1</button>':'')+'</div>').join('')+'<div class="srow"><span>Defensa total <b>'+DEF()+'</b></span></div></div><div class="card"><h2>Equipo</h2><div class="eqrow"><div class="slot">'+ico(P.w)+'</div><div class="slot">'+ico(P.ar)+'</div><div class="grow num">'+wl(P.w)+'<br>'+wl(P.ar)+'</div></div></div><div class="card"><h2>Mochila</h2><div class="grid">'+slots()+'</div>'+(it?det(it,false):'<p class="num">Toca un objeto para ver sus datos.</p>')+'</div><button style="width:100%;margin-bottom:14px" onclick="go(\'tree\')">Árbol de habilidades ('+P.sp+')</button><button style="width:100%" onclick="go(ret)">Volver</button>';return}
 if(scr=="mp"){const iv='style="width:100%;padding:8px;border:4px solid var(--line);background:var(--slot);color:#fff"';A.innerHTML='<h1>Multijugador</h1><p class="sub">Cooperativo de 1 a 4. Más jugadores, más difícil.</p><div class="card"><h2>Tu nombre</h2><input id="nm" maxlength="12" value="Héroe'+R(10,99)+'" '+iv+'></div><button class="pick" onclick="mkRoom(1)"><h2>Crear sala</h2>Serás el anfitrión y recibirás un código.</button><div class="card"><h2>Código de sala</h2><input id="cd" maxlength="4" placeholder="ABCD" '+iv+'></div><button class="pick" onclick="mkRoom(0)"><h2>Unirme a la sala</h2></button><button class="pick" onclick="go(\'menu\')">Volver</button>';return}
 if(scr=="mnone"){A.innerHTML='<h1>Multijugador</h1><div class="card">'+MSG+'</div><button style="width:100%" onclick="go(\'menu\')">Volver</button>';return}
-if(scr=="lobby"){const ps=roster();A.innerHTML='<h1>Sala '+M.code+'</h1><p class="sub">'+(M.host?'Eres el anfitrión. Pasa el código a tus amigos.':'Esperando a que el anfitrión comience...')+'</p><div class="card"><h2>Jugadores ('+ps.length+')</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+fa(CL[q.presence.c].e,28)+esc(q.presence.nm)+(q.presence.h?' 👑':'')+(q.peer==M.me?' (tú)':'')+'</span><span class="num">'+CL[q.presence.c].n+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hStart()">Comenzar partida</button>':'')+'<button style="width:100%" onclick="go(\'menu\')">Salir</button>';return}
+if(scr=="lobby"){const ps=roster();A.innerHTML='<h1>Sala '+M.code+'</h1><p class="sub">'+(M.host?'Eres el anfitrión. Pasa el código a tus amigos.':'Esperando a que el anfitrión comience...')+'</p><div class="card"><h2>Jugadores ('+ps.length+')</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+hs(q.presence.c,28)+esc(q.presence.nm)+(q.presence.h?' 👑':'')+(q.peer==M.me?' (tú)':'')+'</span><span class="num">'+CL[q.presence.c].n+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hStart()">Comenzar partida</button>':'')+'<button style="width:100%" onclick="go(\'menu\')">Salir</button>';return}
 if(scr=="mvote"){const G=M.G,ps=roster(),me=ps.find(q=>q.peer==M.me),my=me?vk(me):-1;A.innerHTML=hd("Votación")+'<div class="card">'+MSG+'</div><p class="sub">Voten el próximo paso. Si hay empate, decide el anfitrión 👑.</p>'+(G.op||[]).map((k,i)=>{const vs=ps.filter(q=>vk(q)==i);return '<button class="pick'+(my==i?' tgt':'')+'" onclick="mvote('+i+')"><div class="row">'+fa(ND[k][0],40)+'<div class="grow"><h2>'+ND[k][1]+'</h2>'+ND[k][2]+'<div class="num">'+vs.length+' voto(s)'+(vs.length?': '+vs.map(q=>esc(q.presence.nm)).join(', '):'')+'</div></div></div></button>'}).join('')+'<div class="num" style="margin-bottom:10px">Han votado '+ps.filter(q=>vk(q)>=0).length+' de '+ps.length+'</div>'+(M.host?'<button style="width:100%;margin-bottom:12px" onclick="hDecide()">Cerrar votación ya</button>':'')+pb().replace('<button','<button style="width:100%"');return}
 if(scr=="mshop"){const G=M.G,s=G.sh,mine=G.ph=="shop"&&G.cur==M.me,it=SEL!=null?P.inv[SEL]:null,ph=10+P.f*2,pm=8+P.f*2;
 if(!s){A.innerHTML=hd("Mercader")+'<div class="card">Abriendo la tienda...</div>';return}
 const can2=c=>mine&&P.gold>=c;
-A.innerHTML=hd("Mercader")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+(G.ph!="shop"?'🛒 La tienda cerró. Esperando al grupo...':mine?'🛒 ¡Tu turno de comprar!':'🛒 Compra: '+esc(rn(G.cur)))+'</b><div class="order">'+s.o.map((id,i)=>'<span class="oi'+(i==s.ti&&G.ph=="shop"?' cur':i<s.ti||G.ph!="shop"?' past':'')+'">'+(roster().find(q=>q.peer==id)?fa(CL[roster().find(q=>q.peer==id).presence.c].e,28)+'<small>'+esc(rn(id))+' 💰'+roster().find(q=>q.peer==id).presence.gd+'</small>':'')+'</span>').join('')+'</div></div>'+
+A.innerHTML=hd("Mercader")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+(G.ph!="shop"?'🛒 La tienda cerró. Esperando al grupo...':mine?'🛒 ¡Tu turno de comprar!':'🛒 Compra: '+esc(rn(G.cur)))+'</b><div class="order">'+s.o.map((id,i)=>'<span class="oi'+(i==s.ti&&G.ph=="shop"?' cur':i<s.ti||G.ph!="shop"?' past':'')+'">'+(roster().find(q=>q.peer==id)?hs(roster().find(q=>q.peer==id).presence.c,28)+'<small>'+esc(rn(id))+' 💰'+roster().find(q=>q.peer==id).presence.gd+'</small>':'')+'</span>').join('')+'</div></div>'+
 '<div class="card"><h2>Tienda del grupo</h2><div class="num" style="margin-bottom:6px">Objetos al azar de cualquier clase. Si no sirven para ti, dáselos o intercámbialos con un compañero.</div><div class="srow"><span class="row"><span class="ic">'+PIC("h")+'</span>Poción de vida ×'+s.hp+' · '+ph+'</span><button class="sm" '+(s.hp&&can2(ph)?'':'disabled')+' onclick="mbuy(\'h\')">Comprar</button></div><div class="srow"><span class="row"><span class="ic">'+PIC("m")+'</span>Poción de maná ×'+s.mp+' · '+pm+'</span><button class="sm" '+(s.mp&&can2(pm)?'':'disabled')+' onclick="mbuy(\'m\')">Comprar</button></div>'+s.it.map((x,i)=>'<div class="srow"><span class="row"><span class="ic">'+(x.w?ico(x.w):PIC(x.s?"s":"a"))+'</span><span>'+(x.w?wl(x.w):x.t)+' · '+x.pr+'</span></span><button class="sm" '+(can2(x.pr)?'':'disabled')+' onclick="mbuy('+i+')">Comprar</button></div>').join('')+'</div>'+
 '<div class="card"><h2>Tu mochila</h2><div class="grid">'+slots()+'</div>'+(it?det(it,mine):'<p class="num">Toca un objeto. Solo puedes vender en tu turno.</p>')+'</div>'+
 (mine?'<button style="width:100%;margin-bottom:12px" onclick="mdone()">Terminar mi turno</button>':'')+pb().replace('<button','<button style="width:100%"');return}
-if(scr=="mwait"){const ps=roster();A.innerHTML=hd("Preparativos")+'<div class="card"><h2>Grupo</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+fa(CL[q.presence.c].e,28)+esc(q.presence.nm)+' · nivel '+q.presence.lv+'</span><span class="num">'+(q.presence.rd?'Listo ✔':'Eligiendo...')+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hGo()">Iniciar combate'+(ps.every(q=>q.presence.rd)?'':' (forzar)')+'</button>':'<p class="sub">Esperando al anfitrión...</p>')+pb().replace('<button','<button style="width:100%"');return}
-if(scr=="mend"){const G=M.G,ps=roster(),W=[["🗡️ Más daño causado",0],["🛡️ Más daño recibido",1],["💚 Más curación",2],["💰 Más oro gastado",3],["🔷 Más maná gastado",4],["✨ Más revivios",5]];A.innerHTML='<h1>'+(G.w?'¡Victoria!':'Derrota')+'</h1><p class="sub">Llegaron al combate '+(G.w?40:G.n)+' de 40.</p><div class="card"><h2>Premios</h2>'+W.map(([t,i])=>{const b=ps.slice().sort((a,c)=>c.presence.s[i]-a.presence.s[i])[0];return b&&b.presence.s[i]>0?'<div class="srow"><span>'+t+'</span><span><b>'+esc(b.presence.nm)+'</b> · '+b.presence.s[i]+'</span></div>':''}).join('')+'</div><div class="card"><h2>Tabla</h2>'+ps.map(q=>{const z=q.presence;return '<div class="srow"><span class="row">'+fa(CL[z.c].e,28)+'<span>'+esc(z.nm)+'<br><span class="num">⚔ '+z.s[0]+' · 🛡 '+z.s[1]+' · 💚 '+z.s[2]+' · 💰 '+z.s[3]+' · 🔷 '+z.s[4]+' · ✨ '+z.s[5]+'</span></span></span></div>'}).join('')+'</div><button style="width:100%" onclick="go(\'menu\')">Volver al menú</button>';return}
-if(scr=="mfight"){const G=M.G,t=tgi(),C=CL[P.c],dn=roster().some(q=>q.presence.dn),mine=G.ph=="play"&&G.cur==M.me&&!P.down&&!M.busy,d=!mine,cq=G.q&&G.q[G.ti];
+if(scr=="mwait"){const ps=roster();A.innerHTML=hd("Preparativos")+'<div class="card"><h2>Grupo</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+hs(q.presence.c,28)+esc(q.presence.nm)+' · nivel '+q.presence.lv+'</span><span class="num">'+(q.presence.rd?'Listo ✔':'Eligiendo...')+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hGo()">Iniciar combate'+(ps.every(q=>q.presence.rd)?'':' (forzar)')+'</button>':'<p class="sub">Esperando al anfitrión...</p>')+pb().replace('<button','<button style="width:100%"');return}
+if(scr=="mend"){const G=M.G,ps=roster(),W=[["🗡️ Más daño causado",0],["🛡️ Más daño recibido",1],["💚 Más curación",2],["💰 Más oro gastado",3],["🔷 Más maná gastado",4],["✨ Más revivios",5]];A.innerHTML='<h1>'+(G.w?'¡Victoria!':'Derrota')+'</h1><p class="sub">Llegaron al combate '+(G.w?40:G.n)+' de 40.</p><div class="card"><h2>Premios</h2>'+W.map(([t,i])=>{const b=ps.slice().sort((a,c)=>c.presence.s[i]-a.presence.s[i])[0];return b&&b.presence.s[i]>0?'<div class="srow"><span>'+t+'</span><span><b>'+esc(b.presence.nm)+'</b> · '+b.presence.s[i]+'</span></div>':''}).join('')+'</div><div class="card"><h2>Tabla</h2>'+ps.map(q=>{const z=q.presence;return '<div class="srow"><span class="row">'+hs(z.c,28)+'<span>'+esc(z.nm)+'<br><span class="num">⚔ '+z.s[0]+' · 🛡 '+z.s[1]+' · 💚 '+z.s[2]+' · 💰 '+z.s[3]+' · 🔷 '+z.s[4]+' · ✨ '+z.s[5]+'</span></span></span></div>'}).join('')+'</div><button style="width:100%" onclick="go(\'menu\')">Volver al menú</button>';return}
+if(scr=="mfight"){const G=M.G,t=tgi(),tq0=taId(false),tq=tq0?tq0.peer:null,C=CL[P.c],dn=roster().some(q=>q.presence.dn),mine=G.ph=="play"&&G.cur==M.me&&!P.down&&!M.busy,d=!mine,cq=G.q&&G.q[G.ti];
 const who=G.ph!="play"?"":P.down?"💀 Estás caído":G.cur==M.me?"🎯 ¡Es tu turno!":"⏳ Turno de "+esc(G.cn||"...");
-A.innerHTML=hd("Combate")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+who+'</b><div class="order">'+(G.q||[]).map((x,i)=>'<span class="oi'+(i==G.ti?' cur':i<G.ti?' past':'')+'" title="'+esc(x.n)+'">'+fa(x.e,28)+'<small>'+x.s+'</small></span>').join('')+'</div><div class="num">Orden por velocidad (el número es la velocidad)</div></div>'+
-G.en.map((e,i)=>'<div class="card row'+(i==t?' tgt':'')+'" onclick="M.tg='+i+';draw()" style="padding:8px;opacity:'+(e.hp>0?1:.35)+'">'+fa(e.e,48)+'<div class="grow"><div class="name"><span>'+esc(e.n)+(cq&&cq.k=="e"&&cq.i==i?' ▶':'')+(e.pois>0?' ☠️':'')+(e.stun?' ❄️':'')+(e.g>0?' 🛡️':'')+'</span><span class="num">'+Math.max(0,e.hp)+'/'+e.max+'</span></div>'+bar("hp",e.hp,e.max)+'<div class="num">Vel '+e.sp+' · Débil: '+EI[e.w]+' · Resiste: '+EI[e.r]+'</div></div></div>').join('')+
+A.innerHTML=hd("Combate")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+who+'</b><div class="order">'+(G.q||[]).map((x,i)=>'<span class="oi'+(i==G.ti?' cur':i<G.ti?' past':'')+'" title="'+esc(x.n)+'">'+qic(x)+'<small>'+x.s+'</small></span>').join('')+'</div><div class="num">Orden por velocidad (el número es la velocidad)</div></div>'+
+G.en.map((e,i)=>'<div class="card row'+(i==t?' tgt':'')+'" onclick="M.tg='+i+';draw()" style="padding:8px;opacity:'+(e.hp>0?1:.35)+'">'+es(e.n,48)+'<div class="grow"><div class="name"><span>'+esc(e.n)+(cq&&cq.k=="e"&&cq.i==i?' ▶':'')+(e.dots&&e.dots.length?' 🩸':'')+(e.wk>0?' 📉':'')+(e.sl>0?' 🐌':'')+(e.vu>0?' 🎯':'')+(e.pois>0?' ☠️':'')+(e.stun?' ❄️':'')+(e.g>0?' 🛡️':'')+'</span><span class="num">'+Math.max(0,e.hp)+'/'+e.max+'</span></div>'+bar("hp",e.hp,e.max)+'<div class="num">Vel '+e.sp+' · Débil: '+EI[e.w]+' · Resiste: '+EI[e.r]+'</div></div></div>').join('')+
 '<div class="card" id="log">'+G.lg.map(x=>'<p>'+esc(x)+'</p>').join('')+'</div>'+
-'<div class="card"><h2>Grupo</h2>'+roster().map(q=>{const z=q.presence;return '<div class="row" style="margin-bottom:6px">'+fa(CL[z.c].e,28)+'<div class="grow"><div class="name"><span>'+esc(z.nm)+(z.dn?' 💀':'')+(q.peer==M.me?' (tú)':'')+(G.cur==q.peer?' ▶':'')+'</span><span class="num">'+z.hp+'/'+z.mx+' · Vel '+z.sp+'</span></div>'+bar("hp",z.hp,z.mx)+'</div></div>'}).join('')+'<div class="num">Tu maná '+P.mp+'/'+P.mmax+'</div>'+bar("mp",P.mp,P.mmax)+'</div>'+
+'<div class="card"><h2>Grupo</h2>'+roster().map(q=>{const z=q.presence;return '<div class="row'+(q.peer==tq?' tgt':'')+'" onclick="M.ta=\''+q.peer+'\';draw()" style="margin-bottom:6px;padding:2px">'+hs(z.c,28)+'<div class="grow"><div class="name"><span>'+esc(z.nm)+(z.dn?' 💀':'')+(q.peer==M.me?' (tú)':'')+(G.cur==q.peer?' ▶':'')+'</span><span class="num">'+z.hp+'/'+z.mx+' · Vel '+z.sp+'</span></div>'+bar("hp",z.hp,z.mx)+'</div></div>'}).join('')+'<div class="num">Tu maná '+P.mp+'/'+P.mmax+'</div>'+bar("mp",P.mp,P.mmax)+'<div class="num">'+(P.sh>0?' 🛡️'+P.sh:'')+(P.rg?' 🌱'+P.rg.h+'×'+P.rg.t:'')+(P.bf?' ⚔️+25%':'')+(P.pz>0?' ☠️':'')+'</div><div class="num">Toca un enemigo (ataques) o un aliado (curas y apoyos). Objetivo de curas: '+(tq0?esc(tq0.presence.nm):'-')+'</div></div>'+
 '<div class="acts"><button '+(d?'disabled':'')+' onclick="mAct(\'a\')">Atacar<small>+1 de maná</small></button>'+
-P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'disabled':'')+' onclick="mAct('+i+')">'+x.n+'<small>'+(x.h?x.h+' de vida':x.c+' de maná')+' '+EI[x.e]+'</small></button>'}).join('')+
+P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'disabled':'')+' onclick="mAct('+i+')">'+x.n+'<small>'+(x.h?x.h+' de vida':x.c+' de maná')+' '+EI[x.e]+tgt2(x)+'</small></button>'}).join('')+
 '<button '+(d?'disabled':'')+' onclick="mAct(\'d\')">Defender<small>+3 de maná</small></button>'+
 '<button '+(d||P.pot<1?'disabled':'')+' onclick="mAct(\'p\')">Poción de vida<small>quedan '+P.pot+'</small></button>'+
 '<button '+(d||P.mpot<1?'disabled':'')+' onclick="mAct(\'q\')">Poción de maná<small>quedan '+P.mpot+'</small></button>'+
@@ -484,12 +1268,12 @@ P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'d
 const l=$("log");if(l)l.scrollTop=1e5;return}
 const C=CL[P.c],d=busy||over,tg=F.k=="e"?" · Élite":F.k=="b"?" · Jefe":"";
 A.innerHTML=hd("Combate")+
-'<div class="card row"><div id="ef">'+fa(F.e,64)+'</div><div class="grow"><div class="name"><span>'+F.n+tg+(F.pois>0?' ☠️':'')+(F.stun?' ❄️':'')+'</span><span class="num">'+Math.max(0,F.hp)+'/'+F.max+'</span></div>'+bar("hp",F.hp,F.max)+'<div class="num">Débil: '+EI[F.w]+' · Resiste: '+EI[F.r]+(P.sm?' · '+P.sm.n+' ('+P.sm.t+')':'')+'</div><div class="num">'+F.sk.map(x=>ESK[x]).join(' · ')+'</div></div></div>'+
+'<div class="card row"><div id="ef">'+es(F.n,64)+'</div><div class="grow"><div class="name"><span>'+F.n+tg+(F.pois>0?' ☠️':'')+(F.stun?' ❄️':'')+'</span><span class="num">'+Math.max(0,F.hp)+'/'+F.max+'</span></div>'+bar("hp",F.hp,F.max)+'<div class="num">Débil: '+EI[F.w]+' · Resiste: '+EI[F.r]+(P.sm?' · '+P.sm.n+' ('+P.sm.t+')':'')+'</div><div class="num">'+F.sk.map(x=>ESK[x]).join(' · ')+'</div></div></div>'+
 '<div class="card" id="log" aria-live="polite">'+LOG.map(t=>'<p>'+t+'</p>').join('')+'</div>'+
-'<div class="card row"><div id="hf">'+fa(C.e,64)+'</div><div class="grow"><div class="name"><span>'+C.n+(P.pz>0?' ☠️':'')+'</span><span class="num">'+P.w[0]+' +'+P.w[1]+'</span></div>'+bar("hp",P.hp,P.max)+'<div class="num">Vida '+P.hp+'/'+P.max+'</div>'+bar("mp",P.mp,P.mmax)+'<div class="num">Maná '+P.mp+'/'+P.mmax+'</div>'+stl(P.st)+'</div></div>'+
+'<div class="card row"><div id="hf">'+hs(P.c,64)+'</div><div class="grow"><div class="name"><span>'+C.n+(P.pz>0?' ☠️':'')+'</span><span class="num">'+P.w[0]+' +'+P.w[1]+'</span></div>'+bar("hp",P.hp,P.max)+'<div class="num">Vida '+P.hp+'/'+P.max+'</div>'+bar("mp",P.mp,P.mmax)+'<div class="num">Maná '+P.mp+'/'+P.mmax+'</div>'+stl(P.st)+'</div></div>'+
 (over?'<div class="acts"><button onclick="go(\'pick\')">Jugar otra vez</button><button onclick="go(\'menu\')">Menú</button></div>':
 '<div class="acts"><button '+(d?'disabled':'')+' onclick="act(\'a\')">Atacar<small>+1 de maná</small></button>'+
-P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'disabled':'')+' onclick="act('+i+')">'+x.n+'<small>'+(x.h?x.h+' de vida':x.c+' de maná')+' '+EI[x.e]+'</small></button>'}).join('')+
+P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'disabled':'')+' onclick="act('+i+')">'+x.n+'<small>'+(x.h?x.h+' de vida':x.c+' de maná')+' '+EI[x.e]+tgt2(x)+'</small></button>'}).join('')+
 '<button '+(d?'disabled':'')+' onclick="act(\'d\')">Defender<small>+3 de maná</small></button>'+
 '<button '+(d||P.pot<1?'disabled':'')+' onclick="act(\'p\')">Poción de vida<small>quedan '+P.pot+'</small></button>'+
 '<button '+(d||P.mpot<1?'disabled':'')+' onclick="act(\'q\')">Poción de maná<small>quedan '+P.mpot+'</small></button>'+
@@ -516,25 +1300,18 @@ if(k=="rec"){const g=Math.round(R(25,45)*(1+P.f*.1)*P.gm);P.gold+=g;if(Math.rand
 if(k=="ent"){P.pts+=2;MSG="Entrenas duro: +2 puntos de estadística."}
 if(k=="alt"){P.hp=Math.max(1,P.hp-12);P.pts+=4;MSG="El altar toma 12 de vida y te concede 4 puntos de estadística."}
 go("msg")}
-function fight(k){const n=P.f+1;if(n%10==0)k="b";const Z=EN[Math.min(3,Math.floor((n-1)/10))],b=k=="b"?Z.b[0]:pk(Z[k]),sh=1+.17*(n-1),sa=1+.07*(n-1);
-F={n:b[0],e:b[1],hp:Math.round(b[2]*sh),atk:Math.round(b[3]*sa),w:b[4],r:b[5],sk:b[6],pois:0,stun:0,g:0,k};F.max=F.hp;P.sm=null;P.pz=0;P.def=false;busy=false;LOG=[];say("Aparece "+F.n+(k=="e"?" (élite)":k=="b"?" (jefe)":"")+".");go("fight")}
-function em(el,wel,bs){let m=1;if(!bs){if(el==wel)m=1.3;else if(OPP[el]==wel)m=.7}if(F.w==el)m*=1.5;if(F.r==el)m*=.5;return m}
-function hit(m,t,cb,el,bs){const x=em(el,P.w[5],bs);HN=F.w==el?" ¡Punto débil!":F.r==el?" (resiste)":x>1?" (afinidad)":x<1?" (arma opuesta)":"";let b=(P.st[TI[t]]+P.w[1]+R(0,4))*m*x*(1+P.dm)*(F.g>0?.5:1);if(P.buff){b*=2;P.buff=false}
+function fight(k){const n=P.f+1;if(n%10==0)k="b";const Z=EN[Math.min(3,Math.floor((n-1)/10))],b=k=="b"?pk(Z.b):pk(Z[k]),sh=HPS(n)*(k=="b"?1.2:1),sa=ATS(n);
+F={n:b[0],e:b[1],hp:Math.round(b[2]*sh),atk:Math.round(b[3]*sa),w:b[4],r:b[5],sk:b[6],pois:0,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,k};F.max=F.hp;P.sm=null;P.pz=0;P.def=false;busy=false;LOG=[];say("Aparece "+F.n+(k=="e"?" (élite)":k=="b"?" (jefe)":"")+".");go("fight")}
+function em(el,wel,bs,pi){let m=1;if(!bs){if(el==wel)m=1.3;else if(OPP[el]==wel)m=.7}if(F.w==el)m*=1.5;if(F.r==el&&!pi)m*=.5;return m}
+function hit(m,t,cb,el,bs,pi){const x=em(el,P.w[5],bs,pi);HN=F.w==el?" ¡Punto débil!":F.r==el?" (resiste)":x>1?" (afinidad)":x<1?" (arma opuesta)":"";let b=(P.st[TI[t]]+P.w[1]+R(0,4))*m*x*(1+P.dm+(P.bf?P.bf.d:0))*(F.g>0&&!pi?.5:1)*(F.vu>0?1.3:1);if(P.buff){b*=2;P.buff=false}
 const c=Math.random()<.03+P.st[2]*.01+P.st[5]*.015+(cb||0);if(c)b*=1.8;b=Math.round(b);P.hp=Math.min(P.max,P.hp+Math.floor(b*P.ls));return[b,c]}
 function act(k){if(!busy&&!over)snd(sfx(k));
-if(busy||over)return;busy=true;P.def=false;hitId="ef";
+if(busy||over)return;busy=true;P.def=false;hitId="ef";tickP();
 if(k=="a"){const[d,c]=hit(1,P.w[2],0,P.w[5],1);F.hp-=d;P.mp=Math.min(P.mmax,P.mp+1);say((c?"¡Crítico! ":"")+"Atacas y causas "+d+" de daño."+HN)}
 else if(k=="d"){P.def=true;P.mp=Math.min(P.mmax,P.mp+3);hitId=null;say("Te cubres y recuperas 3 de maná.")}
 else if(k=="p"){P.pot--;const h=Math.min(Math.ceil(P.max*.4),P.max-P.hp);P.hp+=h;hitId=null;say("Bebes una poción: +"+h+" de vida.")}
 else if(k=="q"){P.mpot--;const h=Math.min(Math.ceil(P.mmax*.4),P.mmax-P.mp);P.mp+=h;hitId=null;say("Bebes una poción de maná: +"+h+".")}
-else{const s=CL[P.c].sk[k];P.mp-=s.c;if(s.h)P.hp-=s.h;
-if(s.k=="dmg"||s.k=="stun"||s.k=="drain"){const[d,c]=hit(s.m,s.t,s.cb,s.e);F.hp-=d;say(s.n+(c?" (¡crítico!)":"")+": "+d+" de daño."+HN+(s.k=="stun"?" Aturdido.":""));
-if(s.k=="stun")F.stun=1;if(s.k=="drain"){const h=Math.min(Math.floor(d/2),P.max-P.hp);P.hp+=h;say("Robas "+h+" de vida.")}}
-if(s.k=="summon"){P.sm={n:s.n,d:Math.round(s.b+P.st[1]*s.mm),t:s.tt,e:s.e};hitId=null;say("Invocas a "+s.n+" durante "+s.tt+" turnos.")}
-if(s.k=="buff"){P.buff=true;hitId=null;say("Tu próximo ataque hará el doble de daño.")}
-if(s.k=="pois"){F.pois=3;F.pd=4+P.lvl;say("Envenenas a "+F.n+": "+F.pd+" de daño por turno durante 3 turnos.")}
-if(s.k=="ward"){P.wd=2;hitId=null;say("Un escudo divino reduce a la mitad el daño durante 2 turnos.")}
-if(s.k=="heal"){const h=Math.min(P.st[1]*s.m+12,P.max-P.hp);P.hp+=h;hitId=null;say("Curas "+h+" de vida.")}}
+else{spSkill(CL[P.c].sk[k])}
 draw();
 if(F.hp<=0){setTimeout(win,700);return}
 setTimeout(foe,800)}
@@ -542,6 +1319,9 @@ function end(){busy=false;draw()}
 function foe(){if(F.g>0)F.g--;
 if(P.sm){const d=Math.max(1,Math.round(P.sm.d*em(P.sm.e,"",1)));F.hp-=d;say(P.sm.n+" ataca: "+d+" de daño.");if(--P.sm.t<=0){say(P.sm.n+" desaparece.");P.sm=null}if(F.hp<=0){draw();setTimeout(win,600);return}}
 if(F.pois>0){F.pois--;F.hp-=F.pd;say("El veneno causa "+F.pd+" de daño.");if(F.hp<=0){draw();setTimeout(win,600);return}}
+if(F.dots&&F.dots.length){let t=0;F.dots=F.dots.filter(o=>{t+=o.d;return--o.t>0});F.hp-=t;say(F.n+" sufre daño continuo ("+t+").");if(F.hp<=0){draw();setTimeout(win,600);return}}
+const wk=F.wk>0;if(F.wk>0)F.wk--;if(F.vu>0)F.vu--;
+if(F.sl>0){F.sl--;if(Math.random()<.5){say(F.n+" está ralentizado y pierde el turno.");return end()}}
 if(F.stun){F.stun=0;say(F.n+" está aturdido y pierde el turno.");return end()}
 if(P.pz>0){P.pz--;P.hp-=P.pzd;say("El veneno te causa "+P.pzd+" de daño.");if(P.hp<=0)return die()}
 if(Math.random()<P.st[2]*.008){say("¡Esquivas el ataque de "+F.n+"!");return end()}
@@ -549,9 +1329,9 @@ const k=F.sk.length&&Math.random()<.35+Math.min(.3,(P.f+1)*.006)?pk(F.sk):"";
 if(k=="heal"){const h=Math.round(F.max*.2);F.hp=Math.min(F.max,F.hp+h);say(F.n+" usa "+ESK[k]+": +"+h+" de vida.");return end()}
 if(k=="rage"){F.atk=Math.round(F.atk*1.25);say(F.n+" usa "+ESK[k]+": su ataque aumenta.");return end()}
 if(k=="guard"){F.g=2;say(F.n+" adopta una postura defensiva: recibe la mitad de daño.");return end()}
-let d=F.atk+R(-2,3);if(k=="heavy")d=Math.round(d*1.8);if(k=="multi")d=Math.round(d*1.4);
+let d=Math.round(F.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")d=Math.round(d*1.8);if(k=="multi")d=Math.round(d*1.4);
 d=Math.round(d*100/(100+DEF()*4))-Math.floor(DEF()/3);if(P.def)d=Math.ceil(d/2);if(P.wd>0){d=Math.ceil(d/2);P.wd--}d=Math.max(1,d);
-snd("hit");P.hp-=d;say(F.n+(k?" usa "+ESK[k]:" te ataca")+": "+d+" de daño.");hitId="hf";
+if(P.sh>0){const a=Math.min(P.sh,d);P.sh-=a;d-=a}snd("hit");P.hp-=d;say(F.n+(k?" usa "+ESK[k]:" te ataca")+": "+d+" de daño.");hitId="hf";
 if(k=="pois"){P.pz=3;P.pzd=Math.round(2+F.atk*.12);say("¡Estás envenenado! ("+P.pzd+" de daño por turno)")}
 if(k=="drain")F.hp=Math.min(F.max,F.hp+Math.floor(d/2));
 if(P.hp<=0)return die();
@@ -562,8 +1342,8 @@ function win(){
 const n=P.f+1,k=F.k;P.f=n;saveRec(n);say("¡Derrotas a "+F.n+"!");
 const g=Math.round({n:R(12,22),e:R(35,50),b:R(90,110)}[k]*(1+n*.1)*P.gm);P.gold+=g;
 if(n>=40){snd("win");over=true;say("¡Victoria! Has vencido a "+F.n+" y terminado la senda. Oro final: "+P.gold+".");return draw()}
-P.lvl++;P.pts+=3;P.sp++;derive();P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.25));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.4));
-let t="+"+g+" de oro. Nivel "+P.lvl+" (+3 puntos y +1 de habilidad). ";
+P.lvl++;P.pts+=3;P.sp+=n>=20?2:1;derive();P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.25));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.4));
+let t="+"+g+" de oro. Nivel "+P.lvl+" (+3 puntos y +"+(n>=20?2:1)+" de habilidad). ";
 
 if(k!="n"||Math.random()<.3){const w=drop(k=="n"?0:1);P.inv.push(w);t+="Botín: "+w[0]+" (para "+CL[cls(w)].n+"). "}
 if(k=="b"){P.ws+=2;t+="Un jefe suelta 2 piedras de afilar. "}else if(Math.random()<.25){P.ws++;t+="Encuentras una piedra de afilar."}
