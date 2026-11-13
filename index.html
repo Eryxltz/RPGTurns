@@ -375,12 +375,12 @@ function hResume(){const G=M.G;bc();if(G.ph=="play"){G.cur=null;hRound()}else if
 function mCatch(d){const miss=d.f-P.f;P.down=false;if(P.hp<=0)P.hp=Math.ceil(P.max*.3);
 if(miss>0){let sg=0;for(let n=P.f+1;n<=d.f;n++)sg+=n>=20?2:1;P.f=d.f;P.lvl+=miss;P.pts+=3*miss;P.sp+=sg;derive();P.hp=P.max;P.mp=P.mmax;M.note="Volviste a la partida: subiste "+miss+" nivel(es) mientras no estabas."}
 else M.note="Volviste a la partida.";
-if(d.ph=="shop"||d.ph=="node")M.sk=d.f;if(d.ph=="node"||d.ph=="story"){if(d.ph=="node")M.nk=d.f;M.sn=d.sn;M.rd=true;upP()}M.fn=d.ph=="play"?0:d.n;M.G=d;go(ROUTE[d.ph]||"lobby")}
+if(d.ph=="shop"||d.ph=="node")M.sk=d.f;if(d.ph=="node"||d.ph=="story"){if(d.ph=="node")M.nk=d.f;M.sn=d.sn;if(d.ph=="story")M.sa=d.sn;else M.rd=true;upP()}M.fn=d.ph=="play"?0:d.n;M.G=d;go(ROUTE[d.ph]||"lobby")}
 function hostWatch(){if(!M||M.host||M.late||!M.rm)return;if(roster().some(z=>z.presence.h)){M.hl=0;return}if(Date.now()-M.t0<7000)return;if(!M.hl)M.hl=Date.now();if(Date.now()-M.hl>180000){M.late=1;MSG="El anfitrión no volvió a la sala.";go("mnone")}}
 const alive=()=>roster().filter(q=>!q.presence.dn);
 const rn=id=>{const q=roster().find(z=>z.peer==id);return q?q.presence.nm:"..."};
 const vk=q=>{const v=q.presence.v;return M.G&&v>=0&&Math.floor(v/10)==(M.G.vid||0)?v%10:-1};
-function upP(){if(M&&M.rm&&P)M.rm.presence({id:M.pid,nm:M.name,c:P.c,hp:Math.max(0,Math.round(P.hp)),mx:P.max,mp:P.mp,mm:P.mmax,lv:P.lvl,dn:P.down?1:0,rd:M.rd?1:0,h:M.host?1:0,sp:P.st[2],gd:P.gold,v:M.v==null?-1:M.v,s:[P.S.d,P.S.t,P.S.h,P.S.g,P.S.m,P.S.r]});sv()}
+function upP(){if(M&&M.rm&&P)M.rm.presence({id:M.pid,nm:M.name,c:P.c,hp:Math.max(0,Math.round(P.hp)),mx:P.max,mp:P.mp,mm:P.mmax,lv:P.lvl,dn:P.down?1:0,rd:M.rd?1:0,h:M.host?1:0,sp:P.st[2],gd:P.gold,sa:M.sa||0,v:M.v==null?-1:M.v,s:[P.S.d,P.S.t,P.S.h,P.S.g,P.S.m,P.S.r]});sv()}
 function mkRoom(h){const nm=($("nm").value||"").trim().slice(0,12)||"Héroe",cd=h?Array.from({length:4},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[R(0,31)]).join(""):($("cd").value||"").trim().toUpperCase();if(cd.length!=4)return;M={host:!!h,code:cd,name:nm,pid:Math.random().toString(36).slice(2,10),rid:h?Math.random().toString(36).slice(2,8):null,G:null,tg:0,busy:false,rd:false,v:-1,fn:0,tk:"",rm:null,me:null,first:0};go("pick")}
 async function mJoin(){let r=null;try{r=await claude.use("room")}catch(e){}if(!r){MSG="El multijugador no está disponible en esta vista.";go("mnone");return}
 M.me=M.pid;const nm="senda-"+M.code.toLowerCase();
@@ -412,7 +412,7 @@ function bc(){M.rm.emit("st",M.G);sv()}
 function lgp(t){const G=M.G;G.lg.push(t);if(G.lg.length>7)G.lg.shift()}
 function hPeers(){const G=M.G,ps=roster();
 if(G.ph=="node"&&ps.length&&ps.every(z=>z.presence.rd))hGo();
-if(G.ph=="vote"||G.ph=="spare")hVote();if(G.ph=="story"&&ps.length&&ps.every(z=>z.presence.rd))hStoryEnd();
+if(G.ph=="vote"||G.ph=="spare")hVote();if(G.ph=="story"&&ps.length&&ps.every(z=>z.presence.sa==G.sn))hStoryEnd();
 if(G.ph=="play"){if(ps.length&&ps.every(z=>z.presence.dn)){G.ph="end";G.w=0;G.cur=null;lgp("El grupo ha caído.");return bc()}
 const x=G.q&&G.q[G.ti];if(G.cur&&x&&x.k=="p"&&!ps.some(z=>z.peer==G.cur&&!z.presence.dn)){clearTimeout(M.to);hNext()}}
 if(G.ph=="shop"&&G.cur&&!ps.some(z=>z.peer==G.cur))hShopNext()}
@@ -428,7 +428,7 @@ G.en=list.map(b=>{seen[b[0]]=(seen[b[0]]||0)+1;const h=Math.round(b[2]*sh*hz*(k=
 G.sm=[];G.fin=null;G.k=k;G.n=n;G.g=Math.round(list.length*({b:100,e:42,h:17,n:17}[k])*(1+n*.1)*(.9+Math.random()*.2));
 G.lg=[(k=="b"?"¡Jefe! ":k=="e"?"¡Élite! ":k=="h"?"¡Horda! ":"")+G.en.map(e=>e.n).join(", ")+(N>1?" ("+N+" jugadores)":"")];G.rd=0;hRound()}
 // orden de turnos por velocidad
-function hSm(x){const G=M.G,e=G.en.find(z=>z.hp>0);if(!e)return;const d=Math.max(1,Math.round(x.d*(e.w==x.e?1.5:1)*(e.r==x.e?.5:1)*(e.vu>0?1.3:1)));e.hp-=d;lgp(x.n+" ataca: "+d+" de daño.");M.rm.emit("ef",{to:x.o,k:"cred",v:d})}
+function hSm(x){const G=M.G,e=G.en.find(z=>z.hp>0);if(!e)return;const d=Math.max(1,Math.round(x.d*(e.w==x.e?1.5:1)*(isR(e,x.e)?.5:1)*(e.vu>0?1.3:1)));e.hp-=d;lgp(x.n+" ataca: "+d+" de daño.");M.rm.emit("ef",{to:x.o,k:"cred",v:d})}
 function hSmTick(){const G=M.G;if(!G.sm||!G.sm.length)return;G.sm.forEach(x=>{hSm(x);x.t--});G.sm.filter(x=>x.t<=0).forEach(x=>lgp(x.n+" desaparece."));G.sm=G.sm.filter(x=>x.t>0)}
 function hRound(){const G=M.G;G.rd++;G.ph="play";hSmTick();const q=[];
 roster().forEach(p=>{if(!p.presence.dn)q.push({k:"p",i:p.peer,s:(p.presence.sp||1)+Math.random()*.9,e:CL[p.presence.c].e,n:p.presence.nm})});
@@ -457,7 +457,7 @@ const t=pk(al);let k=e.sk.length&&Math.random()<.35+Math.min(.3,G.n*.006)?pk(e.s
 if(k=="heal"){const h=Math.round(e.max*.2);e.hp=Math.min(e.max,e.hp+h);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="rage"){e.atk=Math.round(e.atk*1.25);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="guard"){e.g=2;lgp(e.n+" adopta una postura defensiva.");bc();return nx(900)}
-if(k=="call"){G.called=1;const N2=G.N||1;(G.bs||[]).filter(b=>b.k=="spare").forEach(b=>{const h=Math.round(b.t[2]*HPS(40)*.3*(1+.6*(N2-1)));G.en.push({n:b.t[0],e:b.t[1],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)*.6),sp:20,w:b.t[4],r:b.t[5],sk:b.t[6],pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,ac:1})});lgp(e.n+" invoca a los jefes perdonados: "+(G.bs||[]).filter(b=>b.k=="spare").map(b=>b.t[0]).join(", ")+".");bc();return nx(1200)}
+if(k=="call"){G.called=1;const N2=G.N||1;(G.bs||[]).filter(b=>b.k=="spare").forEach(b=>{const h=Math.round(b.t[2]*HPS(40)*1.2*(1+.6*(N2-1)));G.en.push({n:b.t[0],e:b.t[1],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)*(1+.12*(N2-1))),sp:20,w:b.t[4],r:b.t[5],sk:b.t[6],pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,ac:1})});lgp(e.n+" invoca a los jefes perdonados: "+(G.bs||[]).filter(b=>b.k=="spare").map(b=>b.t[0]).join(", ")+".");bc();return nx(1200)}
 let raw=Math.round(e.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")raw=Math.round(raw*1.8);if(k=="multi")raw=Math.round(raw*1.4);
 if(k=="fire")raw=Math.round(raw*1.5);if(k=="inferno")raw=Math.round(raw*1.9);if(k=="drain")e.hp=Math.min(e.max,e.hp+Math.floor(raw*.4));if(k=="inferno"){lgp(e.n+" usa "+ESK[k]+" sobre todo el grupo.");bc();al.forEach(q=>M.rm.emit("eh",{to:q.peer,raw:Math.round(raw*.5),k:"fire",pd:0}));return nx(1500)}
 lgp(e.n+(k?" usa "+ESK[k]:" ataca")+" a "+t.presence.nm+".");bc();M.rm.emit("eh",{to:t.peer,raw,k,pd:Math.round(2+e.atk*.12)});nx(1400)}
@@ -478,7 +478,7 @@ G.f=40;G.ph="end";G.w=1;bc()}
 function hFin(key){const G=M.G,N=Math.max(1,roster().length),d=FIN[key],h=Math.round(d.hp*HPS(40)*(1+.6*(N-1)));G.N=N;G.n=40;G.k="b";G.fin=key;G.sm=[];G.called=0;
 G.en=[{n:d.n,e:"👑",hp:h,max:h,atk:Math.round(d.atk*ATS(40)*(1+.12*(N-1))),sp:30,w:d.w,r:d.r,sk:d.sk,pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,ac:d.ac,fire:d.fire?1:0}];
 G.lg=["¡"+d.n+"!"];G.rd=0;hRound()}
-function hFinNext(){const G=M.G;clearTimeout(M.to);G.cur=null;const sp=(G.bs||[]).some(b=>b.k=="spare"),k=G.fin;
+function hFinNext(){const G=M.G;clearTimeout(M.to);G.cur=null;const sp=(G.bs||[]).length>=3&&(G.bs||[]).every(b=>b.k=="spare"),k=G.fin;
 if(k=="ar1")return hStory(sp?"kianArrive":"arPhase2");
 if(k=="ki1")return hStory("kianPhase2");
 hStory(k=="ar2"?"endA":"endB")}
@@ -511,13 +511,15 @@ function onSt(d){if(!d||!M)return;if(M.late)return;
 if(!M.first){M.first=1;if(!M.host){if(M.resume&&M.rid&&d.rid==M.rid)mCatch(d);else if(d.ph!="lobby"){M.late=1;M.rm.presence({c:null});MSG="La partida ya empezó. Pide al anfitrión una sala nueva.";go("mnone");return}}}
 if(d.rid&&!M.rid)M.rid=d.rid;
 if(!M.host)M.G=d;
-if(d.ph=="story"&&M.sn!=d.sn){M.sn=d.sn;M.rd=false;upP();story(d.sid,()=>{M.rd=true;upP();go("mwait")},d.bn||"")}
+if(d.ph=="story"&&M.sn!=d.sn){M.sn=d.sn;story(d.sid,()=>{M.sa=d.sn;upP();go("mwait")},d.bn||"")}
 if(d.ph=="play"){if(d.n!=M.fn||(d.fin&&d.fin!=M.fk)){if(d.fin&&M.fk&&d.fin!=M.fk){P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.3));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.3))}M.fk=d.fin;M.fn=d.n;M.tk="";M.tg=0;P.def=false;P.wd=0;P.sm=null;P.buff=false;P.pz=0;P.skip=0;M.rd=false;go("mfight")}
 const tk=d.rd+":"+d.ti;if(tk!=M.tk){M.tk=tk;onTurn(d)}}
 if(d.f>P.f&&["vote","story","spare"].includes(d.ph))mWon(d);
 else if(d.ph=="vote"&&M.relicPending){M.relicPending=false;rl();return}
 else if(d.ph=="shop"&&M.sk!=d.f){M.sk=d.f;go("mshop")}
 else if(d.ph=="node"&&M.nk!=d.f){M.nk=d.f;mNode(d)}
+if(d.ph=="spare"&&scr!="mvote")go("mvote");
+if(d.ph=="vote"&&!M.relicPending&&scr!="mvote"&&scr!="relic")go("mvote");
 if(d.ph=="end"&&scr!="mend"){snd(d.w?"win":"lose");go("mend");return}
 if(["lobby","mwait","mfight","mend","mvote","mshop"].includes(scr))draw()}
 function onTurn(d){if(d.cur==M.me&&!P.down){M.busy=false;P.def=false;snd("turn");tickP();if(P.hp<=0){P.hp=0;P.down=true;M.busy=true;upP();M.rm.emit("act",{fx:[],lg:M.name+" cae quemado."});draw();return}
@@ -593,18 +595,19 @@ kianPhase2:[["K","Interesante... pero yo escribo las historias."],["K2","Ya no h
 endA:[["N","Arlechino cae. El telón se rasga y la verdad se derrama sobre Aletia."],["N","Nadie perdonó a sus sirvientes, y la verdad llegó sola, fría y sin consuelo."],["N","FIN: La verdad sin piedad."]],
 endB:[["N","Kian cierra su libro por última vez. Los sirvientes perdonados se despiden con una reverencia."],["N","Por primera vez, Aletia escribe su propia historia."],["N","FIN: La historia compartida."]]};
 const SPN={A:["Arlechino","Arlechino, el que protege la verdad con mentiras"],T:["El dueño de la verdad","El dueño de la verdad"],K:["Kian","Kian, el cuentacuentos"],K2:["Kian, dueño de la historia","Kian, dueño de la historia"]};
-const FIN={ar1:{n:"Arlechino, el que protege la verdad con mentiras",hp:280,atk:16,w:"luz",r:"osc",sk:["multi","heavy","stun","guard"],ac:2},
-ar2:{n:"El dueño de la verdad",hp:320,atk:14,w:"hielo",r:"fuego",sk:["fire","inferno","rage","multi"],ac:3,fire:1},
-ki1:{n:"Kian, el cuentacuentos",hp:280,atk:16,w:"osc",r:"luz",sk:["call","drain","stun","multi"],ac:2},
-ki2:{n:"Kian, dueño de la historia",hp:340,atk:14,w:"luz",r:"osc",sk:["heavy","drain","rage","multi"],ac:3}};
+const FIN={ar1:{n:"Arlechino, el que protege la verdad con mentiras",hp:560,atk:16.8,w:"luz",r:"osc",sk:["multi","heavy","stun","guard"],ac:2},
+ar2:{n:"El dueño de la verdad",hp:640,atk:14.7,w:"hielo",r:"fuego",sk:["fire","inferno","rage","multi"],ac:3,fire:1},
+ki1:{n:"Kian, el cuentacuentos",hp:560,atk:16.8,w:"",r:["luz","osc"],sk:["call","drain","stun","multi"],ac:2},
+ki2:{n:"Kian, dueño de la historia",hp:680,atk:14.7,w:"",r:["luz","osc"],sk:["heavy","drain","rage","multi"],ac:3}};
 Object.assign(ESK,{fire:"Llamarada ardiente",inferno:"Infierno abrasador",call:"Invocar a los perdonados"});
+const isR=(e,el)=>Array.isArray(e.r)?e.r.includes(el):e.r==el,wT=e=>e.w?EI[e.w]:"ninguna",rT=e=>[].concat(e.r||[]).map(x=>EI[x]).join(" ")||"ninguna";
 function stLines(id,bn){return(STORY[id]||[]).map(([w,t])=>[w,t.replace(/\{B\}/g,bn||"")])}
 function story(id,done,bn){STQ={l:stLines(id,bn),i:0,done,bn:bn||""};go("story")}
 function stNext(){if(!STQ)return;STQ.i++;if(STQ.i>=STQ.l.length){const d=STQ.done;STQ=null;if(d)d()}else draw()}
 // un jugador: finales y decisión sobre los jefes
 function finStart(){story("arIntro",()=>startFin("ar1"),"")}
 function startFin(key){const d=FIN[key];F={n:d.n,e:"👑",hp:Math.round(d.hp*HPS(40)),atk:Math.round(d.atk*ATS(40)),w:d.w,r:d.r,sk:d.sk,pois:0,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,k:"b",fin:key,ac:d.ac,fire:d.fire,ex:[],called:0};F.max=F.hp;P.sm=null;P.pz=0;P.bn=null;P.def=false;busy=false;XT=-1;LOG=[];say("Aparece "+F.n+" (jefe).");go("fight")}
-function finNext(){const k=F.fin,sp=P.bs.some(b=>b.k=="spare");P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.3));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.3));
+function finNext(){const k=F.fin,sp=P.bs.length>=3&&P.bs.every(b=>b.k=="spare");P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.3));P.mp=Math.min(P.mmax,P.mp+Math.ceil(P.mmax*.3));
 if(k=="ar1")return story(sp?"kianArrive":"arPhase2",()=>startFin(sp?"ki1":"ar2"),"");
 if(k=="ki1")return story("kianPhase2",()=>startFin("ki2"),"");
 story(k=="ar2"?"endA":"endB",()=>{P.f=40;saveRec(40);snd("win");over=true;say("¡Victoria! Has terminado la historia. Oro final: "+P.gold+".");go("fight")},"")}
@@ -1322,8 +1325,10 @@ Continuar=Continue
 El destino de=The fate of
 ¿Qué harás con=What will you do with
 ¿Qué harán con=What will you do with
-Si lo perdonan, la historia cambiará. Si hay empate, decide el anfitrión 👑.=If you spare it, the story will change. If there is a tie, the host 👑 decides.
-Si lo perdonas, la historia cambiará.=If you spare it, the story will change.
+La historia solo cambiará si perdonan a los tres jefes. Si hay empate, decide el anfitrión 👑.=The story will only change if you spare all three bosses. If there is a tie, the host 👑 decides.
+La historia solo cambiará si perdonas a los tres jefes.=The story will only change if you spare all three bosses.
+Jefes perdonados hasta ahora:=Bosses spared so far:
+ninguna=none
 Perdonar la vida=Spare its life
 Vivirá, pero su historia seguirá escribiéndose.=It will live, but its story will go on being written.
 Acabar con él=Finish it
@@ -1370,11 +1375,11 @@ A.innerHTML=hd("Habilidades")+'<p class="sub">Puntos de habilidad: <b>'+P.sp+'</
 if(scr=="inv"){const it=SEL!=null?P.inv[SEL]:null;A.innerHTML=hd("Personaje")+'<p class="sub">Nivel '+P.lvl+(P.pts?' · <span class="tag">'+P.pts+' puntos de estadística</span>':'')+' · Habilidad: <b>'+P.sp+'</b></p><div class="card">'+P.st.map((v,i)=>'<div class="srow"><span>'+SN[i]+' <b>'+v+'</b></span>'+(P.pts?'<button class="sm" onclick="add('+i+')">+1</button>':'')+'</div>').join('')+'<div class="srow"><span>Defensa total <b>'+DEF()+'</b></span></div></div><div class="card"><h2>Equipo</h2><div class="eqrow"><div class="slot">'+ico(P.w)+'</div><div class="slot">'+ico(P.ar)+'</div><div class="grow num">'+wl(P.w)+'<br>'+wl(P.ar)+'</div></div></div><div class="card"><h2>Mochila</h2><div class="grid">'+slots()+'</div>'+(it?det(it,false):'<p class="num">Toca un objeto para ver sus datos.</p>')+'</div><button style="width:100%;margin-bottom:14px" onclick="go(\'tree\')">Árbol de habilidades ('+P.sp+')</button><button style="width:100%" onclick="go(ret)">Volver</button>';return}
 if(scr=="story"){const q=STQ,[w,t]=q.l[q.i],nm=w=="N"?"Narrador":w=="B"?q.bn:SPN[w][0],img=w=="N"?fa0("📜",64):es(w=="B"?q.bn:SPN[w][1],64);
 A.innerHTML='<div class="card"><div class="row">'+img+'<div class="grow"><h2>'+esc(nm)+'</h2><p style="margin:4px 0 0">'+esc(t)+'</p></div></div></div><button style="width:100%" onclick="stNext()">'+(q.i<q.l.length-1?'Continuar':'Seguir')+'</button><p class="num" style="text-align:center">'+(q.i+1)+'/'+q.l.length+'</p>';return}
-if(scr=="spare"){const nm=P.cb[0];A.innerHTML='<h1>El destino de '+esc(nm)+'</h1><div class="card row">'+es(nm,64)+'<div class="grow">¿Qué harás con '+esc(nm)+'? Si lo perdonas, la historia cambiará.</div></div><button class="pick" onclick="spareDo(1)"><h2>Perdonar la vida</h2>Vivirá, pero su historia seguirá escribiéndose.</button><button class="pick" onclick="spareDo(0)"><h2>Acabar con él</h2>El telón se cierra para siempre.</button>';return}
+if(scr=="spare"){const nm=P.cb[0];A.innerHTML='<h1>El destino de '+esc(nm)+'</h1><div class="card row">'+es(nm,64)+'<div class="grow">¿Qué harás con '+esc(nm)+'? La historia solo cambiará si perdonas a los tres jefes.<br><span class="num">Jefes perdonados hasta ahora: '+P.bs.filter(b=>b.k=="spare").length+' de 3.</span></div></div><button class="pick" onclick="spareDo(1)"><h2>Perdonar la vida</h2>Vivirá, pero su historia seguirá escribiéndose.</button><button class="pick" onclick="spareDo(0)"><h2>Acabar con él</h2>El telón se cierra para siempre.</button>';return}
 if(scr=="mp"){const iv='style="width:100%;padding:8px;border:4px solid var(--line);background:var(--slot);color:#fff"';A.innerHTML='<h1>Multijugador</h1><p class="sub">Cooperativo de 1 a 4. Más jugadores, más difícil.</p><div class="card"><h2>Tu nombre</h2><input id="nm" maxlength="12" value="Héroe'+R(10,99)+'" '+iv+'></div><button class="pick" onclick="mkRoom(1)"><h2>Crear sala</h2>Serás el anfitrión y recibirás un código.</button><div class="card"><h2>Código de sala</h2><input id="cd" maxlength="4" placeholder="ABCD" '+iv+'></div><button class="pick" onclick="mkRoom(0)"><h2>Unirme a la sala</h2></button><button class="pick" onclick="go(\'menu\')">Volver</button>';return}
 if(scr=="mnone"){A.innerHTML='<h1>Multijugador</h1><div class="card">'+MSG+'</div><button style="width:100%" onclick="go(\'menu\')">Volver</button>';return}
 if(scr=="lobby"){const ps=roster();A.innerHTML='<h1>Sala '+M.code+'</h1><p class="sub">'+(M.host?'Eres el anfitrión. Pasa el código a tus amigos.':'Esperando a que el anfitrión comience...')+'</p><div class="card"><h2>Jugadores ('+ps.length+')</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+hs(q.presence.c,28)+esc(q.presence.nm)+(q.presence.h?' 👑':'')+(q.peer==M.me?' (tú)':'')+'</span><span class="num">'+CL[q.presence.c].n+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hStart()">Comenzar partida</button>':'')+'<button style="width:100%" onclick="go(\'menu\')">Salir</button>';return}
-if(scr=="mvote"&&M.G.ph=="spare"){const G=M.G,ps=roster(),me=ps.find(q=>q.peer==M.me),my=me?vk(me):-1,nm=G.bn||"";A.innerHTML='<h1>El destino de '+esc(nm)+'</h1><div class="card row">'+es(nm,64)+'<div class="grow">¿Qué harán con '+esc(nm)+'? Si lo perdonan, la historia cambiará. Si hay empate, decide el anfitrión 👑.</div></div>'+[["Perdonar la vida","Vivirá, pero su historia seguirá escribiéndose."],["Acabar con él","El telón se cierra para siempre."]].map((o,i)=>{const vs=ps.filter(q=>vk(q)==i);return '<button class="pick'+(my==i?' tgt':'')+'" onclick="mvote('+i+')"><h2>'+o[0]+'</h2>'+o[1]+'<div class="num">'+vs.length+' voto(s)'+(vs.length?': '+vs.map(q=>esc(q.presence.nm)).join(', '):'')+'</div></button>'}).join('')+(M.host?'<button style="width:100%;margin-bottom:12px" onclick="hSpareDecide()">Cerrar votación ya</button>':'');return}
+if(scr=="mvote"&&M.G.ph=="spare"){const G=M.G,ps=roster(),me=ps.find(q=>q.peer==M.me),my=me?vk(me):-1,nm=G.bn||"";A.innerHTML='<h1>El destino de '+esc(nm)+'</h1><div class="card row">'+es(nm,64)+'<div class="grow">¿Qué harán con '+esc(nm)+'? La historia solo cambiará si perdonan a los tres jefes. Si hay empate, decide el anfitrión 👑.<br><span class="num">Jefes perdonados hasta ahora: '+(G.bs||[]).filter(b=>b.k=="spare").length+' de 3.</span></div></div>'+[["Perdonar la vida","Vivirá, pero su historia seguirá escribiéndose."],["Acabar con él","El telón se cierra para siempre."]].map((o,i)=>{const vs=ps.filter(q=>vk(q)==i);return '<button class="pick'+(my==i?' tgt':'')+'" onclick="mvote('+i+')"><h2>'+o[0]+'</h2>'+o[1]+'<div class="num">'+vs.length+' voto(s)'+(vs.length?': '+vs.map(q=>esc(q.presence.nm)).join(', '):'')+'</div></button>'}).join('')+(M.host?'<button style="width:100%;margin-bottom:12px" onclick="hSpareDecide()">Cerrar votación ya</button>':'');return}
 if(scr=="mvote"){const G=M.G,ps=roster(),me=ps.find(q=>q.peer==M.me),my=me?vk(me):-1;A.innerHTML=hd("Votación")+'<div class="card">'+MSG+'</div><p class="sub">Voten el próximo paso. Si hay empate, decide el anfitrión 👑.</p>'+(G.op||[]).map((k,i)=>{const vs=ps.filter(q=>vk(q)==i);return '<button class="pick'+(my==i?' tgt':'')+'" onclick="mvote('+i+')"><div class="row">'+fa(ND[k][0],40)+'<div class="grow"><h2>'+ND[k][1]+'</h2>'+ND[k][2]+'<div class="num">'+vs.length+' voto(s)'+(vs.length?': '+vs.map(q=>esc(q.presence.nm)).join(', '):'')+'</div></div></div></button>'}).join('')+'<div class="num" style="margin-bottom:10px">Han votado '+ps.filter(q=>vk(q)>=0).length+' de '+ps.length+'</div>'+(M.host?'<button style="width:100%;margin-bottom:12px" onclick="hDecide()">Cerrar votación ya</button>':'')+pb().replace('<button','<button style="width:100%"');return}
 if(scr=="mshop"){const G=M.G,s=G.sh,mine=G.ph=="shop"&&G.cur==M.me,it=SEL!=null?P.inv[SEL]:null,ph=10+P.f*2,pm=8+P.f*2;
 if(!s){A.innerHTML=hd("Mercader")+'<div class="card">Abriendo la tienda...</div>';return}
@@ -1383,12 +1388,12 @@ A.innerHTML=hd("Mercader")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+(G.
 '<div class="card"><h2>Tienda del grupo</h2><div class="num" style="margin-bottom:6px">Objetos al azar de cualquier clase. Si no sirven para ti, dáselos o intercámbialos con un compañero.</div><div class="srow"><span class="row"><span class="ic">'+PIC("h")+'</span>Poción de vida ×'+s.hp+' · '+ph+'</span><button class="sm" '+(s.hp&&can2(ph)?'':'disabled')+' onclick="mbuy(\'h\')">Comprar</button></div><div class="srow"><span class="row"><span class="ic">'+PIC("m")+'</span>Poción de maná ×'+s.mp+' · '+pm+'</span><button class="sm" '+(s.mp&&can2(pm)?'':'disabled')+' onclick="mbuy(\'m\')">Comprar</button></div>'+s.it.map((x,i)=>'<div class="srow"><span class="row"><span class="ic">'+(x.w?ico(x.w):PIC(x.s?"s":"a"))+'</span><span>'+(x.w?wl(x.w):x.t)+' · '+x.pr+'</span></span><button class="sm" '+(can2(x.pr)?'':'disabled')+' onclick="mbuy('+i+')">Comprar</button></div>').join('')+'</div>'+
 '<div class="card"><h2>Tu mochila</h2><div class="grid">'+slots()+'</div>'+(it?det(it,mine):'<p class="num">Toca un objeto. Solo puedes vender en tu turno.</p>')+'</div>'+
 (mine?'<button style="width:100%;margin-bottom:12px" onclick="mdone()">Terminar mi turno</button>':'')+pb().replace('<button','<button style="width:100%"');return}
-if(scr=="mwait"){const ps=roster();A.innerHTML=hd("Preparativos")+'<div class="card"><h2>Grupo</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+hs(q.presence.c,28)+esc(q.presence.nm)+' · nivel '+q.presence.lv+'</span><span class="num">'+(q.presence.rd?'Listo ✔':'Eligiendo...')+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hProceed()">Iniciar combate'+(ps.every(q=>q.presence.rd)?'':' (forzar)')+'</button>':'<p class="sub">Esperando al anfitrión...</p>')+pb().replace('<button','<button style="width:100%"');return}
+if(scr=="mwait"){const ps=roster();A.innerHTML=hd("Preparativos")+'<div class="card"><h2>Grupo</h2>'+ps.map(q=>'<div class="srow"><span class="row">'+hs(q.presence.c,28)+esc(q.presence.nm)+' · nivel '+q.presence.lv+'</span><span class="num">'+((M.G.ph=="story"?q.presence.sa==M.G.sn:q.presence.rd)?'Listo ✔':'Eligiendo...')+'</span></div>').join('')+'</div>'+(M.host?'<button style="width:100%;margin-bottom:14px" onclick="hProceed()">Iniciar combate'+((M.G.ph=='story'?ps.every(q=>q.presence.sa==M.G.sn):ps.every(q=>q.presence.rd))?'':' (forzar)')+'</button>':'<p class="sub">Esperando al anfitrión...</p>')+pb().replace('<button','<button style="width:100%"');return}
 if(scr=="mend"){const G=M.G,ps=roster(),W=[["🗡️ Más daño causado",0],["🛡️ Más daño recibido",1],["💚 Más curación",2],["💰 Más oro gastado",3],["🔷 Más maná gastado",4],["✨ Más revivios",5]];A.innerHTML='<h1>'+(G.w?'¡Victoria!':'Derrota')+'</h1><p class="sub">Llegaron al combate '+(G.w?40:G.n)+' de 40.</p><div class="card"><h2>Premios</h2>'+W.map(([t,i])=>{const b=ps.slice().sort((a,c)=>c.presence.s[i]-a.presence.s[i])[0];return b&&b.presence.s[i]>0?'<div class="srow"><span>'+t+'</span><span><b>'+esc(b.presence.nm)+'</b> · '+b.presence.s[i]+'</span></div>':''}).join('')+'</div><div class="card"><h2>Tabla</h2>'+ps.map(q=>{const z=q.presence;return '<div class="srow"><span class="row">'+hs(z.c,28)+'<span>'+esc(z.nm)+'<br><span class="num">⚔ '+z.s[0]+' · 🛡 '+z.s[1]+' · 💚 '+z.s[2]+' · 💰 '+z.s[3]+' · 🔷 '+z.s[4]+' · ✨ '+z.s[5]+'</span></span></span></div>'}).join('')+'</div><button style="width:100%" onclick="go(\'menu\')">Volver al menú</button>';return}
 if(scr=="mfight"){const G=M.G,t=tgi(),tq0=taId(false),tq=tq0?tq0.peer:null,C=CL[P.c],dn=roster().some(q=>q.presence.dn),mine=G.ph=="play"&&G.cur==M.me&&!P.down&&!M.busy,d=!mine,cq=G.q&&G.q[G.ti];
 const who=G.ph!="play"?"":P.down?"💀 Estás caído":G.cur==M.me?"🎯 ¡Es tu turno!":"⏳ Turno de "+esc(G.cn||"...");
 A.innerHTML=hd("Combate")+'<div class="card turn'+(mine?' mine':'')+'"><b>'+who+'</b><div class="order">'+(G.q||[]).map((x,i)=>'<span class="oi'+(i==G.ti?' cur':i<G.ti?' past':'')+'" title="'+esc(x.n)+'">'+qic(x)+'<small>'+x.s+'</small></span>').join('')+'</div><div class="num">Orden por velocidad (el número es la velocidad)</div>'+((G.sm||[]).length?'<div class="num">Invocaciones activas: '+G.sm.map(x=>esc(x.n)+' ('+esc(rn(x.o))+', '+x.t+')').join(' · ')+'</div>':'')+'</div>'+
-G.en.map((e,i)=>'<div class="card row'+(i==t?' tgt':'')+'" onclick="M.tg='+i+';draw()" style="padding:8px;opacity:'+(e.hp>0?1:.35)+'">'+es(e.n,48)+'<div class="grow"><div class="name"><span>'+esc(e.n)+(cq&&cq.k=="e"&&cq.i==i?' ▶':'')+(e.dots&&e.dots.length?' 🩸':'')+(e.ac>1?' · actúa '+e.ac+' veces':'')+(e.wk>0?' 📉':'')+(e.sl>0?' 🐌':'')+(e.vu>0?' 🎯':'')+(e.pois>0?' ☠️':'')+(e.stun?' ❄️':'')+(e.g>0?' 🛡️':'')+'</span><span class="num">'+Math.max(0,e.hp)+'/'+e.max+'</span></div>'+bar("hp",e.hp,e.max)+'<div class="num">Vel '+e.sp+' · Débil: '+EI[e.w]+' · Resiste: '+EI[e.r]+'</div></div></div>').join('')+
+G.en.map((e,i)=>'<div class="card row'+(i==t?' tgt':'')+'" onclick="M.tg='+i+';draw()" style="padding:8px;opacity:'+(e.hp>0?1:.35)+'">'+es(e.n,48)+'<div class="grow"><div class="name"><span>'+esc(e.n)+(cq&&cq.k=="e"&&cq.i==i?' ▶':'')+(e.dots&&e.dots.length?' 🩸':'')+(e.ac>1?' · actúa '+e.ac+' veces':'')+(e.wk>0?' 📉':'')+(e.sl>0?' 🐌':'')+(e.vu>0?' 🎯':'')+(e.pois>0?' ☠️':'')+(e.stun?' ❄️':'')+(e.g>0?' 🛡️':'')+'</span><span class="num">'+Math.max(0,e.hp)+'/'+e.max+'</span></div>'+bar("hp",e.hp,e.max)+'<div class="num">Vel '+e.sp+' · Débil: '+wT(e)+' · Resiste: '+rT(e)+'</div></div></div>').join('')+
 '<div class="card" id="log">'+G.lg.map(x=>'<p>'+esc(x)+'</p>').join('')+'</div>'+
 '<div class="card"><h2>Grupo</h2>'+roster().map(q=>{const z=q.presence;return '<div class="row'+(q.peer==tq?' tgt':'')+'" onclick="M.ta=\''+q.peer+'\';draw()" style="margin-bottom:6px;padding:2px">'+hs(z.c,28)+'<div class="grow"><div class="name"><span>'+esc(z.nm)+(z.dn?' 💀':'')+(q.peer==M.me?' (tú)':'')+(G.cur==q.peer?' ▶':'')+'</span><span class="num">'+z.hp+'/'+z.mx+' · Vel '+z.sp+'</span></div>'+bar("hp",z.hp,z.mx)+'</div></div>'}).join('')+'<div class="num">Tu maná '+P.mp+'/'+P.mmax+'</div>'+bar("mp",P.mp,P.mmax)+'<div class="num">'+(P.sh>0?' 🛡️'+P.sh:'')+(P.rg?' 🌱'+P.rg.h+'×'+P.rg.t:'')+(P.bf?' ⚔️+25%':'')+(P.pz>0?' ☠️':'')+'</div><div class="num">Toca un enemigo (ataques) o un aliado (curas y apoyos). Objetivo de curas: '+(tq0?esc(tq0.presence.nm):'-')+'</div></div>'+
 '<div class="acts"><button '+(d?'disabled':'')+' onclick="mAct(\'a\')">Atacar<small>+1 de maná</small></button>'+
@@ -1401,7 +1406,7 @@ P.eq.map(i=>{const x=C.sk[i];return '<button '+(d||P.mp<x.c||(x.h&&P.hp<=x.h)?'d
 const l=$("log");if(l)l.scrollTop=1e5;return}
 const C=CL[P.c],d=busy||over,tg=(F.k=="e"?" · Élite":F.k=="b"?" · Jefe":"")+(F.ac>1?" · actúa "+F.ac+" veces":"");
 A.innerHTML=hd("Combate")+
-'<div class="card row'+(XT<0&&F.ex&&F.ex.length?' tgt':'')+'" onclick="XT=-1;draw()"><div id="ef">'+es(F.n,64)+'</div><div class="grow"><div class="name"><span>'+F.n+tg+(F.pois>0?' ☠️':'')+(F.stun?' ❄️':'')+'</span><span class="num">'+Math.max(0,F.hp)+'/'+F.max+'</span></div>'+bar("hp",F.hp,F.max)+'<div class="num">Débil: '+EI[F.w]+' · Resiste: '+EI[F.r]+(P.sm?' · '+P.sm.n+' ('+P.sm.t+')':'')+'</div><div class="num">'+F.sk.map(x=>ESK[x]).join(' · ')+'</div></div></div>'+
+'<div class="card row'+(XT<0&&F.ex&&F.ex.length?' tgt':'')+'" onclick="XT=-1;draw()"><div id="ef">'+es(F.n,64)+'</div><div class="grow"><div class="name"><span>'+F.n+tg+(F.pois>0?' ☠️':'')+(F.stun?' ❄️':'')+'</span><span class="num">'+Math.max(0,F.hp)+'/'+F.max+'</span></div>'+bar("hp",F.hp,F.max)+'<div class="num">Débil: '+wT(F)+' · Resiste: '+rT(F)+(P.sm?' · '+P.sm.n+' ('+P.sm.t+')':'')+'</div><div class="num">'+F.sk.map(x=>ESK[x]).join(' · ')+'</div></div></div>'+
 (F.ex&&F.ex.length?'<div class="card"><h2>Invocados</h2>'+F.ex.map((x,i)=>'<div class="row'+(XT==i?' tgt':'')+'" onclick="XT='+i+';draw()" style="padding:4px">'+es(x.n,36)+'<div class="grow"><div class="name"><span>'+esc(x.n)+'</span><span class="num">'+Math.max(0,x.hp)+'/'+x.max+'</span></div>'+bar("hp",x.hp,x.max)+'</div></div>').join('')+'<div class="num">Toca para apuntar. Al caer el jefe, se desvanecen.</div></div>':'')+'<div class="card" id="log" aria-live="polite">'+LOG.map(t=>'<p>'+t+'</p>').join('')+'</div>'+
 '<div class="card row"><div id="hf">'+hs(P.c,64)+'</div><div class="grow"><div class="name"><span>'+C.n+(P.bn?' 🔥':'')+(P.pz>0?' ☠️':'')+'</span><span class="num">'+P.w[0]+' +'+P.w[1]+'</span></div>'+bar("hp",P.hp,P.max)+'<div class="num">Vida '+P.hp+'/'+P.max+'</div>'+bar("mp",P.mp,P.mmax)+'<div class="num">Maná '+P.mp+'/'+P.mmax+'</div>'+stl(P.st)+'</div></div>'+
 (over?'<div class="acts"><button onclick="go(\'pick\')">Jugar otra vez</button><button onclick="go(\'menu\')">Menú</button></div>':
@@ -1416,7 +1421,7 @@ if(hitId){const e=$(hitId);e&&e.classList.add("hit");hitId=null}}
 function pickC(k){tmp=k;TW=[gw(k,0,0),gw(k,0,1)];go("weapon")}
 function pickW(i){const C=CL[tmp];P={c:tmp,st:[...C.st],lvl:1,pot:2,mpot:1,gold:30,ws:0,pts:0,f:0,w:TW[i],inv:[],def:false,buff:false,wd:0,pz:0,sm:null,sp:1,kn:[true],eq:[0],ar:ga(tmp,0),S:{d:0,t:0,h:0,g:0,m:0,r:0},down:false,bs:[],xh:0,xm:0,dm:0,gm:1,ls:0};derive();P.hp=P.max;P.mp=P.mmax;over=false;MSG="";rl()}
 function rl(){RP=RL.map((_,i)=>i).sort(()=>Math.random()-.5).slice(0,3);go("relic")}
-function relic(i){const m=P.max,mm=P.mmax;RL[RP[i]][2](P);derive();P.hp+=P.max-m;P.mp+=P.mmax-mm;if(P.f==0){M?mJoin():story("intro",()=>fight("n"),"")}else{if(M)go("mvote");else{opts();go("map")}}}
+function relic(i){const m=P.max,mm=P.mmax;RL[RP[i]][2](P);derive();P.hp+=P.max-m;P.mp+=P.mmax-mm;if(P.f==0){M?mJoin():story("intro",()=>fight("n"),"")}else{if(M)go(ROUTE[M.G.ph]||"mvote");else{opts();go("map")}}}
 function learn(i){const s=CL[P.c].sk[i];if(P.kn[i]||P.sp<s.p||(i>1&&!P.kn[i-2]))return;P.sp-=s.p;P.kn[i]=true;if(P.eq.length<4)P.eq.push(i);draw()}
 function add(i){if(P.pts<1)return;P.pts--;bump(i);draw()}
 function eq(i){const x=P.inv[i];if(!can(x))return;const m=P.max;if(isA(x)){P.inv[i]=P.ar;P.ar=x}else{P.inv[i]=P.w;P.w=x}derive();P.hp=Math.max(1,Math.min(P.max,P.hp+P.max-m));SEL=null;draw()}
@@ -1435,8 +1440,8 @@ if(k=="alt"){P.hp=Math.max(1,P.hp-12);P.pts+=4;MSG="El altar toma 12 de vida y t
 go("msg")}
 function fight(k){const n=P.f+1;if(n==40){finStart();return}if(n%10==0)k="b";const Z=EN[Math.min(3,Math.floor((n-1)/10))],b=k=="b"?pk(Z.b):pk(Z[k]),sh=HPS(n)*(k=="b"?1.2:1),sa=ATS(n);
 F={n:b[0],e:b[1],hp:Math.round(b[2]*sh),atk:Math.round(b[3]*sa),w:b[4],r:b[5],sk:b[6],pois:0,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,k};F.max=F.hp;P.sm=null;P.pz=0;P.def=false;busy=false;LOG=[];say("Aparece "+F.n+(k=="e"?" (élite)":k=="b"?" (jefe)":"")+".");P.cb=b;XT=-1;if(k=="b")story("b"+n/10+"pre",()=>go("fight"),F.n);else go("fight")}
-function em(el,wel,bs,pi){let m=1;if(!bs){if(el==wel)m=1.3;else if(OPP[el]==wel)m=.7}if(F.w==el)m*=1.5;if(F.r==el&&!pi)m*=.5;return m}
-function hit(m,t,cb,el,bs,pi){const x=em(el,P.w[5],bs,pi);HN=F.w==el?" ¡Punto débil!":F.r==el?" (resiste)":x>1?" (afinidad)":x<1?" (arma opuesta)":"";let b=(P.st[TI[t]]+P.w[1]+R(0,4))*m*x*(1+P.dm+(P.bf?P.bf.d:0))*(F.g>0&&!pi?.5:1)*(F.vu>0?1.3:1);if(P.buff){b*=2;P.buff=false}
+function em(el,wel,bs,pi){let m=1;if(!bs){if(el==wel)m=1.3;else if(OPP[el]==wel)m=.7}if(F.w==el)m*=1.5;if(isR(F,el)&&!pi)m*=.5;return m}
+function hit(m,t,cb,el,bs,pi){const x=em(el,P.w[5],bs,pi);HN=F.w==el?" ¡Punto débil!":isR(F,el)?" (resiste)":x>1?" (afinidad)":x<1?" (arma opuesta)":"";let b=(P.st[TI[t]]+P.w[1]+R(0,4))*m*x*(1+P.dm+(P.bf?P.bf.d:0))*(F.g>0&&!pi?.5:1)*(F.vu>0?1.3:1);if(P.buff){b*=2;P.buff=false}
 const c=Math.random()<.03+P.st[2]*.01+P.st[5]*.015+(cb||0);if(c)b*=1.8;b=Math.round(b);P.hp=Math.min(P.max,P.hp+Math.floor(b*P.ls));return[b,c]}
 function act(k){if(!busy&&!over)snd(sfx(k));
 if(busy||over)return;busy=true;P.def=false;hitId="ef";tickP();if(P.hp<=0){die();return}MFG=F;if(XT>=0&&F.ex&&F.ex[XT])F=F.ex[XT];
@@ -1461,7 +1466,7 @@ if(P.pz>0){P.pz--;P.hp-=P.pzd;say("El veneno te causa "+P.pzd+" de daño.");if(P
 XA=(F.ac||1)-1;foeAct()}
 function foeAct(){const wk=WKF;if(Math.random()<P.st[2]*.008){say("¡Esquivas el ataque de "+F.n+"!");return end()}
 let k=F.sk.length&&Math.random()<.35+Math.min(.3,(P.f+1)*.006)?pk(F.sk):"";if(F.fin=="ki1"&&!F.called)k="call";if(k=="call"&&(F.called||!P.bs.some(b=>b.k=="spare")))k="";if(F.fire&&!k)k="fire";
-if(k=="call"){F.called=1;F.ex=P.bs.filter(b=>b.k=="spare").map(b=>{const h=Math.round(b.t[2]*HPS(40)*.3);return{n:b.t[0],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)*.6),sk:b.t[6],w:b.t[4],r:b.t[5],dots:[],wk:0,sl:0,vu:0}});say(F.n+" invoca a los jefes perdonados: "+F.ex.map(x=>x.n).join(", ")+".");return end()}
+if(k=="call"){F.called=1;F.ex=P.bs.filter(b=>b.k=="spare").map(b=>{const h=Math.round(b.t[2]*HPS(40)*1.2);return{n:b.t[0],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)),sk:b.t[6],w:b.t[4],r:b.t[5],dots:[],wk:0,sl:0,vu:0}});say(F.n+" invoca a los jefes perdonados: "+F.ex.map(x=>x.n).join(", ")+".");return end()}
 if(k=="heal"){const h=Math.round(F.max*.2);F.hp=Math.min(F.max,F.hp+h);say(F.n+" usa "+ESK[k]+": +"+h+" de vida.");return end()}
 if(k=="rage"){F.atk=Math.round(F.atk*1.25);say(F.n+" usa "+ESK[k]+": su ataque aumenta.");return end()}
 if(k=="guard"){F.g=2;say(F.n+" adopta una postura defensiva: recibe la mitad de daño.");return end()}
