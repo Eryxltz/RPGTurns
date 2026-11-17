@@ -451,16 +451,18 @@ function hEnemy(e,rem){const G=M.G,first=rem==null;if(first)rem=e.ac||1;const nx
 if(first&&e.pois>0){e.pois--;e.hp-=e.pd;lgp(e.n+" sufre veneno ("+e.pd+").");if(e.hp<=0){lgp(e.n+" cae.");bc();return nx(800)}}
 if(first&&e.dots&&e.dots.length){let t=0;e.dots=e.dots.filter(o=>{t+=o.d;return--o.t>0});e.hp-=t;lgp(e.n+" sufre daño continuo ("+t+").");if(e.hp<=0){lgp(e.n+" cae.");bc();return nx(800)}}
 if(first){e.wkf=e.wk>0;if(e.wk>0)e.wk--;if(e.vu>0)e.vu--;if(e.sl>0)e.sl--;if(e.g>0)e.g--}const wk=e.wkf;
-if(first&&e.stun){e.stun=0;lgp(e.n+" está aturdido.");bc();return nx(800)}
+if(first&&e.stun){e.stun=0;if(e.ch){e.ch=null;lgp("¡Su ataque más fuerte se interrumpe!")}lgp(e.n+" está aturdido.");bc();return nx(800)}
 const al=alive();if(!al.length)return hNext();
 const t=pk(al);let k=e.sk.length&&Math.random()<.35+Math.min(.3,G.n*.006)?pk(e.sk):"";if(G.fin=="ki1"&&!G.called)k="call";if(k=="call"&&G.called)k="";if(e.fire&&!k)k="fire";
+if(e.ch){k=e.ch;e.ch=null}else if(ULT[k]){e.ch=k;lgp(e.n+" acumula poder para su ataque más fuerte: "+ESK[k]+"...");bc();return nx(1200)}
 if(k=="heal"){const h=Math.round(e.max*.2);e.hp=Math.min(e.max,e.hp+h);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="rage"){e.atk=Math.round(e.atk*1.25);lgp(e.n+" usa "+ESK[k]+".");bc();return nx(900)}
 if(k=="guard"){e.g=2;lgp(e.n+" adopta una postura defensiva.");bc();return nx(900)}
 if(k=="call"){G.called=1;const N2=G.N||1;(G.bs||[]).filter(b=>b.k=="spare").forEach(b=>{const h=Math.round(b.t[2]*HPS(40)*1.2*(1+.6*(N2-1)));G.en.push({n:b.t[0],e:b.t[1],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)*(1+.12*(N2-1))),sp:20,w:b.t[4],r:b.t[5],sk:b.t[6],pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,ac:1})});lgp(e.n+" invoca a los jefes perdonados: "+(G.bs||[]).filter(b=>b.k=="spare").map(b=>b.t[0]).join(", ")+".");bc();return nx(1200)}
+if(k=="bears"){const alive2=G.en.filter(z=>z.bear&&z.hp>0).length,nb=Math.min(2,4-alive2);if(nb>0){for(let i=0;i<nb;i++){G.bc=(G.bc||0)+1;const h=Math.round(e.max*.12);G.en.push({n:"Oso de luciérnaga "+"ABCDEFGH"[(G.bc-1)%8],e:"🐻",hp:h,max:h,atk:Math.round(e.atk*.5),sp:9,w:"fuego",r:"nat",sk:[],pois:0,pd:5,stun:0,g:0,dots:[],wk:0,sl:0,vu:0,ac:1,bear:1})}lgp(e.n+" invoca osos para luchar.");bc();return nx(1200)}k=""}
 let raw=Math.round(e.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")raw=Math.round(raw*1.8);if(k=="multi")raw=Math.round(raw*1.4);
-if(k=="fire")raw=Math.round(raw*1.5);if(k=="inferno")raw=Math.round(raw*1.9);if(k=="drain")e.hp=Math.min(e.max,e.hp+Math.floor(raw*.4));if(k=="inferno"){lgp(e.n+" usa "+ESK[k]+" sobre todo el grupo.");bc();al.forEach(q=>M.rm.emit("eh",{to:q.peer,raw:Math.round(raw*.5),k:"fire",pd:0}));return nx(1500)}
-lgp(e.n+(k?" usa "+ESK[k]:" ataca")+" a "+t.presence.nm+".");bc();M.rm.emit("eh",{to:t.peer,raw,k,pd:Math.round(2+e.atk*.12)});nx(1400)}
+if(k=="fire")raw=Math.round(raw*1.5);if(k=="inferno")raw=Math.round(raw*1.9);if(MU[k])raw=Math.round(raw*MU[k]);if(k=="shade"||k=="sentence"||k=="touch"||k=="brush"||k=="crimson")e.hp=Math.min(e.max,e.hp+Math.floor(raw*.4));if(AOE[k]){lgp(e.n+" usa "+ESK[k]+" sobre todo el grupo.");bc();al.forEach(q=>M.rm.emit("eh",{to:q.peer,raw:Math.round(raw*AOE[k]),k:(k=="nuke"||k=="forest")?"pois":"",pd:Math.round(2+e.atk*.12)}));return nx(1500)}if(k=="drain")e.hp=Math.min(e.max,e.hp+Math.floor(raw*.4));if(k=="inferno"){lgp(e.n+" usa "+ESK[k]+" sobre todo el grupo.");bc();al.forEach(q=>M.rm.emit("eh",{to:q.peer,raw:Math.round(raw*.5),k:"fire",pd:0}));return nx(1500)}
+lgp(e.n+(k?" usa "+ESK[k]:" ataca")+" a "+t.presence.nm+".");bc();M.rm.emit("eh",{to:t.peer,raw,k:(k=="thorns"?"pois":(k=="glow"||k=="vines")?"stun":k),pd:Math.round(2+e.atk*.12)});nx(1400)}
 function hWin(){const G=M.G;clearTimeout(M.to);G.cur=null;
 if(G.fin)return hFinNext();
 G.f=G.n;lgp("¡Combate "+G.n+" superado!");
@@ -599,9 +601,11 @@ const FIN={ar1:{n:"Arlechino, el que protege la verdad con mentiras",hp:560,atk:
 ar2:{n:"El dueño de la verdad",hp:640,atk:14.7,w:"hielo",r:"fuego",sk:["fire","inferno","rage","multi"],ac:3,fire:1},
 ki1:{n:"Kian, el cuentacuentos",hp:560,atk:16.8,w:"",r:["luz","osc"],sk:["call","drain","stun","multi"],ac:2},
 ki2:{n:"Kian, dueño de la historia",hp:680,atk:14.7,w:"",r:["luz","osc"],sk:["heavy","drain","rage","multi"],ac:3}};
-Object.assign(ESK,{fire:"Llamarada ardiente",inferno:"Infierno abrasador",call:"Invocar a los perdonados"});
+Object.assign(ESK,{fire:"Llamarada ardiente",inferno:"Infierno abrasador",call:"Invocar a los perdonados",laser:"Rayo láser",nuke:"Emergencia nuclear",holy:"Castigo luminoso",shade:"Garra sombría",touch:"Toque divino",blades:"Tajo de espada",sentence:"Sentencia de vida",arrow:"Flecha certera",volley:"Lluvia de flechas",gates:"Puertas de Babilonia: ábranse"});
+// ataques más fuertes: se cargan un turno antes (aturdir al jefe los interrumpe)
+const ULT={nuke:1,touch:1,sentence:1,gates:1},MU={laser:1.4,nuke:2.4,holy:1.3,shade:1.2,touch:2.2,blades:1.3,sentence:2.6,arrow:1.3,volley:1.1,gates:2.4},AOE={nuke:.6,touch:.6,gates:.6,volley:.5};
 const isR=(e,el)=>Array.isArray(e.r)?e.r.includes(el):e.r==el,wT=e=>e.w?EI[e.w]:"ninguna",rT=e=>[].concat(e.r||[]).map(x=>EI[x]).join(" ")||"ninguna";
-function stLines(id,bn){return(STORY[id]||[]).map(([w,t])=>[w,t.replace(/\{B\}/g,bn||"")])}
+function stLines(id,bn){return((BL[bn]&&BL[bn][id])||STORY[id]||[]).map(([w,t])=>[w,t.replace(/\{B\}/g,bn||"")])}
 function story(id,done,bn){STQ={l:stLines(id,bn),i:0,done,bn:bn||""};go("story")}
 function stNext(){if(!STQ)return;STQ.i++;if(STQ.i>=STQ.l.length){const d=STQ.done;STQ=null;if(d)d()}else draw()}
 // un jugador: finales y decisión sobre los jefes
@@ -654,6 +658,23 @@ Object.assign(ECFG,{"Hongo venenoso":["B",null,["#a05ad0","#f0e0f0"]],"Cuervo ca
 "Sombra viviente":["G",null,["#2a2a3a","#9b4dff"]],"Gárgola":["R",null,["#5a6a8a","#3a4a6a"]],"Serpiente alada":["W",null,["#2a8a7a","#e8c070"]],"Verdugo":["H","helm",["#5a1a1a","#222222","#222222","#ff3333","#999999"]],"Devorador de mundos":["D",null,["#3a1a5a","#9b4dff"]]});
 HGL.jester=[0,"..g.....|.cca.aaa|..ccaaaa|...cbkkk"];
 Object.assign(ECFG,{"Arlechino, el que protege la verdad con mentiras":["HR","jester",["#c0283c","#1a1a2a","#222222","#ffd23f","#f4e4d0"]],"El dueño de la verdad":["HR","horns",["#a01e1e","#ffb020","#ff7a1a","#ffe27a","#d86a3a"]],"Kian, el cuentacuentos":["HR","hood",["#2a2a5a","#c8a040","#222222","#ffd23f","#d8b090"]],"Kian, dueño de la historia":["HR","crown",["#4a1a6a","#ffd23f","#e8e8ff","#ffd23f","#e8d0c0"]]});
+EN[0].b=[["008, Cyborg de madera","🤖",235,14,"fuego","rayo",["laser","multi","guard","nuke"]],["Andre, Santo caído en desgracia","😇",240,14,"rayo","luz",["holy","shade","drain","touch"]],["Victor, Doctor Muerte","💀",235,15,"luz","osc",["blades","multi","pois","sentence"]],["Robin, Guardián del bosque","🏹",225,15,"fuego","nat",["arrow","volley","multi","gates"]]];
+Object.assign(ECFG,{"008, Cyborg de madera":["H","helm",["#8a5a2b","#00d8ff","#444444","#00d8ff","#9aa5b1"],"G"],"Andre, Santo caído en desgracia":["HR","halo",["#3a3050","#f0f0ff","#dddddd","#ffd23f","#e8e0f0"]],"Victor, Doctor Muerte":["H","skull",["#1a3a3a","#c8c8c8","#d8d4c0","#ff3333","#d8d4c0","#d8d4c0"],"S"],"Robin, Guardián del bosque":["H","cap",["#2a6a2a","#8a5a2a","#5a3a1a","#dd3333","#f0c090"],"B"]});
+const BL={"008, Cyborg de madera":{b1pre:[["B","Intruso detectado. Arlechino ordenó eliminar. Cargando láseres."]],b1plea:[["B","Sistema dañado... ¿Por qué dudo? Perdóname, por favor."]]},
+"Andre, Santo caído en desgracia":{b1pre:[["B","Fui un santo. Ahora sirvo a Arlechino, y la luz y la sombra obedecen mi mano."]],b1plea:[["B","Perdóname... ya no distingo la luz de la oscuridad."]]},
+"Victor, Doctor Muerte":{b1pre:[["B","Curo con la espada lo que la verdad enferma. Arlechino me enseñó cómo."]],b1plea:[["B","Mi bisturí se quebró. Déjame vivir y repararé mis errores."]]},
+"Robin, Guardián del bosque":{b1pre:[["B","El bosque calla, pero mis flechas hablan. Arlechino prometió proteger lo que amo."]],b1plea:[["B","Mi arco está vacío... perdona a este guardián caído."]]}};
+Object.assign(ESK,{brush:"Pincelada sangrienta",splat:"Salpicadura carmesí",crimson:"Obra maestra carmesí",glow:"Luz cegadora",bears:"Invocar osos",storm:"Tormenta de luciérnagas",arcane:"Descarga arcana",cataclysm:"Cataclismo azul",thorns:"Espinas retorcidas",vines:"Raíces atrapantes",forest:"Bosque hambriento",charge:"Carga de la legión",legion:"Asalto de la legión"});
+Object.assign(ULT,{crimson:1,storm:1,cataclysm:1,forest:1,legion:1});
+Object.assign(MU,{brush:1.3,crimson:2.4,storm:2.2,arcane:1.4,cataclysm:2.4,thorns:1.3,forest:2.2,charge:1.4,legion:2.4,splat:1});
+Object.assign(AOE,{splat:.5,crimson:.6,storm:.6,cataclysm:.6,forest:.6,legion:.6});
+EN[1].b=[["Cain, pintura de sangre","🩸",320,17,"hielo","osc",["brush","splat","drain","crimson"]],["Madre de luciérnagas","🪲",300,16,"fuego","luz",["glow","bears","multi","storm"]],["Tirano azul","👑",330,17,"fuego","hielo",["arcane","drain","guard","cataclysm"]],["Caníbal retorcido","🌿",340,18,"fuego","nat",["thorns","vines","heal","forest"]],["Simon, Comandante de legión","⚔️",335,17,"rayo","fuego",["charge","guard","rage","legion"]]];
+Object.assign(ECFG,{"Cain, pintura de sangre":["HR","hood",["#8a1020","#ff3355","#222222","#ff3355","#e8d0c0"],"T"],"Madre de luciérnagas":["HR","totem",["#4a4a1a","#e8e03a","#222222","#fff27a","#d8b090"]],"Tirano azul":["H","crown",["#1a3a8a","#69a8ff","#e8f0ff","#ffd23f","#c8d8f0"],"T"],"Caníbal retorcido":["H","ears",["#3a5a2a","#6a4a2a","#2a3a1a","#ddcc33","#6a8a3a"],"X"],"Simon, Comandante de legión":["H","helm",["#7a6a3a","#a02a2a","#222222","#d4a017","#c8a070"],"S"],"Oso de luciérnaga":["Q",null,["#7a5a3a","#e8d8a0"]]});
+Object.assign(BL,{"Cain, pintura de sangre":{b2pre:[["B","Pinto con sangre lo que la verdad borró. Arlechino me dio el lienzo."]],b2plea:[["B","Mi pincel tiembla... perdóname, el lienzo ya no me obedece."]]},
+"Madre de luciérnagas":{b2pre:[["B","Mis hijas brillan para Arlechino. Mis osos defenderán nuestro hogar."]],b2plea:[["B","Solo quería proteger a mi enjambre... déjame volver a la oscuridad."]]},
+"Tirano azul":{b2pre:[["B","La magia es el único poder real. Arlechino me la confió; no la tendrás."]],b2plea:[["B","Mi magia se apaga... perdóname, ya no sé gobernar sin ella."]]},
+"Caníbal retorcido":{b2pre:[["B","El bosque me enseñó a tener hambre. Arlechino me alimentó con mentiras."]],b2plea:[["B","Estoy enredado en mis propias raíces... perdóname."]]},
+"Simon, Comandante de legión":{b2pre:[["B","Soy la mano de Arlechino. Mi legión no conoce la duda ni la retirada."]],b2plea:[["B","Mi legión cayó... perdóname, solo cumplía mis órdenes."]]}});
 const ICT={sw:"......aa|.....aAa|....aAa.|...aAa..|c.aAa...|.cAa....|..cc....|.b.c....",fl:"...a....|...aa...|..aaAa..|.aaAAAa.|.aAAcca.|.aAccca.|..aaaa..|........",sn:"...a....|.a.a.a..|..aAa...|aaAAAaa.|..aAa...|.a.a.a..|...a....|........",bo:"....aa..|...aaa..|..aaa...|.aaaaaa.|...aaa..|..aa....|..a.....|........",sp:"...a....|...a....|..aAa...|aaAAAaa.|..aAa...|...a....|...a....|........",mo:"..aaa...|.aA.....|aA......|aA......|aA......|.aA.....|..aaa...|........",le:"....aaa.|...aAaaa|..aAaaaa|.aAaaaa.|aaAaaa..|b.aaa...|b.......|........",ma:"a......a|aa....aa|.aaaaaa.|.aeaaea.|.aaaaaa.|.aaccaa.|..aaaa..|........",ba:"..aaaa..|...aa...|..aAAa..|.aAaaaa.|.aaaaaa.|.aacaaa.|..aaaa..|........",ca:"........|...c....|..ccc...|..cAc...|b.aaa.b.|.baaab..|bbbbbbb.|........",ch:"........|.aaaaaa.|aAAAAAAa|aaaccaaa|aaaccaaa|aaaaaaaa|abbbbbba|........",ha:"........|.aaaaa..|.aAAAaa.|.aaaaa..|...b....|...b....|...b....|..bbb...",db:"........|a......a|aa.bb.aa|aaabbbaa|aa.bb.aa|a......a|........|........",id:"..aaaa..|.aAaaaa.|.aeaaea.|.aaaaaa.|.aabbaa.|.aaaaaa.|..aaaa..|.aaaaaa."};
 const ICN={};[[EI.fis,"sw","#aab4bf","#b87333"],[EI.fuego,"fl","#ff6a2a","#ffd23f"],[EI.hielo,"sn","#69d2ff"],[EI.rayo,"bo","#ffe94a"],[EI.luz,"sp","#fff3a0"],[EI.osc,"mo","#9b4dff"],[EI.nat,"le","#4fdc5a"],[ND.eli[0],"ma","#cc3333"],[ND.mer[0],"ba","#b4733a","#e0b94a"],[ND.rep[0],"ca","#ff6a2a","#ffd23f","#6a3a1a"],[ND.rec[0],"ch","#b4733a","#e0b94a"],[ND.for[0],"ha","#aab4bf","#8a5a2b"],[ND.ent[0],"db","#9aa5b1","#444444"],[ND.alt[0],"id","#9a9a9a"]].forEach(x=>ICN[x[0]]=x.slice(1));
 const rev=r=>[...r].reverse().join(""),dk=c=>{const n=parseInt(c.slice(1),16);return"#"+[16,8,0].map(h=>Math.max(0,((n>>h)&255)-70).toString(16).padStart(2,"0")).join("")};
@@ -1288,6 +1309,59 @@ Serpiente alada=Winged Serpent
 Verdugo=Executioner
 Devorador de mundos=World Devourer
 Sombra servil=Servile Shadow
+Cain, pintura de sangre=Cain, Blood Paint
+Madre de luciérnagas=Mother of Fireflies
+Tirano azul=Blue Tyrant
+Caníbal retorcido=Twisted Cannibal
+Simon, Comandante de legión=Simon, Legion Commander
+Oso de luciérnaga=Firefly Bear
+Pincelada sangrienta=Bloody Brushstroke
+Salpicadura carmesí=Crimson Splatter
+Obra maestra carmesí=Crimson Masterpiece
+Luz cegadora=Blinding Light
+Invocar osos=Summon Bears
+Tormenta de luciérnagas=Firefly Storm
+Descarga arcana=Arcane Discharge
+Cataclismo azul=Blue Cataclysm
+Espinas retorcidas=Twisted Thorns
+Raíces atrapantes=Grasping Roots
+Bosque hambriento=Hungry Forest
+Carga de la legión=Legion Charge
+Asalto de la legión=Legion Assault
+invoca osos para luchar.=summons bears to fight.
+Pinto con sangre lo que la verdad borró. Arlechino me dio el lienzo.=I paint with blood what the truth erased. Arlechino gave me the canvas.
+Mi pincel tiembla... perdóname, el lienzo ya no me obedece.=My brush trembles... forgive me, the canvas no longer obeys me.
+Mis hijas brillan para Arlechino. Mis osos defenderán nuestro hogar.=My daughters shine for Arlechino. My bears will defend our home.
+Solo quería proteger a mi enjambre... déjame volver a la oscuridad.=I only wanted to protect my swarm... let me return to the dark.
+La magia es el único poder real. Arlechino me la confió; no la tendrás.=Magic is the only real power. Arlechino entrusted it to me; you will not have it.
+Mi magia se apaga... perdóname, ya no sé gobernar sin ella.=My magic fades... forgive me, I no longer know how to rule without it.
+El bosque me enseñó a tener hambre. Arlechino me alimentó con mentiras.=The forest taught me hunger. Arlechino fed me lies.
+Estoy enredado en mis propias raíces... perdóname.=I am tangled in my own roots... forgive me.
+Soy la mano de Arlechino. Mi legión no conoce la duda ni la retirada.=I am Arlechino's hand. My legion knows neither doubt nor retreat.
+Mi legión cayó... perdóname, solo cumplía mis órdenes.=My legion fell... forgive me, I was only following orders.
+008, Cyborg de madera=008, Wooden Cyborg
+Andre, Santo caído en desgracia=Andre, Saint Fallen from Grace
+Victor, Doctor Muerte=Victor, Doctor Death
+Robin, Guardián del bosque=Robin, Guardian of the Forest
+Rayo láser=Laser Beam
+Emergencia nuclear=Nuclear Emergency
+Castigo luminoso=Luminous Punishment
+Garra sombría=Shadow Claw
+Toque divino=Divine Touch
+Tajo de espada=Sword Slash
+Sentencia de vida=Life Sentence
+Flecha certera=Sure Arrow
+Puertas de Babilonia: ábranse=Gates of Babylon: Open!
+acumula poder para su ataque más fuerte:=gathers power for its strongest attack:
+¡Su ataque más fuerte se interrumpe!=Its strongest attack is interrupted!
+Intruso detectado. Arlechino ordenó eliminar. Cargando láseres.=Intruder detected. Arlechino ordered elimination. Charging lasers.
+Sistema dañado... ¿Por qué dudo? Perdóname, por favor.=System damaged... Why do I hesitate? Forgive me, please.
+Fui un santo. Ahora sirvo a Arlechino, y la luz y la sombra obedecen mi mano.=I was a saint. Now I serve Arlechino, and light and shadow obey my hand.
+Perdóname... ya no distingo la luz de la oscuridad.=Forgive me... I can no longer tell light from darkness.
+Curo con la espada lo que la verdad enferma. Arlechino me enseñó cómo.=With the sword I cure what the truth makes sick. Arlechino taught me how.
+Mi bisturí se quebró. Déjame vivir y repararé mis errores.=My scalpel broke. Let me live and I will repair my mistakes.
+El bosque calla, pero mis flechas hablan. Arlechino prometió proteger lo que amo.=The forest is silent, but my arrows speak. Arlechino promised to protect what I love.
+Mi arco está vacío... perdona a este guardián caído.=My bow is empty... forgive this fallen guardian.
 En el reino de Aletia todos creen conocer la verdad. Nadie recuerda quién la escribió.=In the kingdom of Aletia everyone believes they know the truth. No one remembers who wrote it.
 Una noche, las campanas del gran teatro sonaron solas y las máscaras de la ciudad se agrietaron.=One night, the bells of the great theater rang by themselves and the masks of the city cracked.
 Quien oyó el llamado baja a la Mazmorra de los Telones, donde Arlechino guarda lo que quiere ocultar.=Whoever heard the call descends into the Dungeon of Curtains, where Arlechino keeps what he wants hidden.
@@ -1461,23 +1535,25 @@ if(F.pois>0){F.pois--;F.hp-=F.pd;say("El veneno causa "+F.pd+" de daño.");if(F.
 if(F.dots&&F.dots.length){let t=0;F.dots=F.dots.filter(o=>{t+=o.d;return--o.t>0});F.hp-=t;say(F.n+" sufre daño continuo ("+t+").");if(F.hp<=0){draw();setTimeout(win,600);return}}
 WKF=F.wk>0;if(F.wk>0)F.wk--;if(F.vu>0)F.vu--;
 if(F.sl>0){F.sl--;if(Math.random()<.5){say(F.n+" está ralentizado y pierde el turno.");return end()}}
-if(F.stun){F.stun=0;say(F.n+" está aturdido y pierde el turno.");return end()}
+if(F.stun){F.stun=0;if(F.ch){F.ch=null;say("¡Su ataque más fuerte se interrumpe!")}say(F.n+" está aturdido y pierde el turno.");return end()}
 if(P.pz>0){P.pz--;P.hp-=P.pzd;say("El veneno te causa "+P.pzd+" de daño.");if(P.hp<=0)return die()}
 XA=(F.ac||1)-1;foeAct()}
 function foeAct(){const wk=WKF;if(Math.random()<P.st[2]*.008){say("¡Esquivas el ataque de "+F.n+"!");return end()}
 let k=F.sk.length&&Math.random()<.35+Math.min(.3,(P.f+1)*.006)?pk(F.sk):"";if(F.fin=="ki1"&&!F.called)k="call";if(k=="call"&&(F.called||!P.bs.some(b=>b.k=="spare")))k="";if(F.fire&&!k)k="fire";
+if(F.ch){k=F.ch;F.ch=null}else if(ULT[k]){F.ch=k;say(F.n+" acumula poder para su ataque más fuerte: "+ESK[k]+"...");return end()}
 if(k=="call"){F.called=1;F.ex=P.bs.filter(b=>b.k=="spare").map(b=>{const h=Math.round(b.t[2]*HPS(40)*1.2);return{n:b.t[0],hp:h,max:h,atk:Math.round(b.t[3]*ATS(40)),sk:b.t[6],w:b.t[4],r:b.t[5],dots:[],wk:0,sl:0,vu:0}});say(F.n+" invoca a los jefes perdonados: "+F.ex.map(x=>x.n).join(", ")+".");return end()}
+if(k=="bears"){F.ex=F.ex||[];const nb=Math.min(2,4-F.ex.length);if(nb>0){for(let i=0;i<nb;i++){const h=Math.round(F.max*.12);F.ex.push({n:"Oso de luciérnaga",hp:h,max:h,atk:Math.round(F.atk*.5),sk:[],w:"fuego",r:"nat",dots:[],wk:0,sl:0,vu:0})}say(F.n+" invoca osos para luchar.");return end()}k=""}
 if(k=="heal"){const h=Math.round(F.max*.2);F.hp=Math.min(F.max,F.hp+h);say(F.n+" usa "+ESK[k]+": +"+h+" de vida.");return end()}
 if(k=="rage"){F.atk=Math.round(F.atk*1.25);say(F.n+" usa "+ESK[k]+": su ataque aumenta.");return end()}
 if(k=="guard"){F.g=2;say(F.n+" adopta una postura defensiva: recibe la mitad de daño.");return end()}
-let d=Math.round(F.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")d=Math.round(d*1.8);if(k=="multi")d=Math.round(d*1.4);if(k=="fire")d=Math.round(d*1.5);if(k=="inferno")d=Math.round(d*1.9);
+let d=Math.round(F.atk*(wk?.7:1))+R(-2,3);if(k=="heavy")d=Math.round(d*1.8);if(k=="multi")d=Math.round(d*1.4);if(k=="fire")d=Math.round(d*1.5);if(k=="inferno")d=Math.round(d*1.9);if(MU[k])d=Math.round(d*MU[k]);
 d=Math.round(d*100/(100+DEF()*4))-Math.floor(DEF()/3);if(P.def)d=Math.ceil(d/2);if(P.wd>0){d=Math.ceil(d/2);P.wd--}d=Math.max(1,d);
 if(P.sh>0){const a=Math.min(P.sh,d);P.sh-=a;d-=a}snd("hit");P.hp-=d;say(F.n+(k?" usa "+ESK[k]:" te ataca")+": "+d+" de daño.");hitId="hf";
-if(k=="pois"){P.pz=3;P.pzd=Math.round(2+F.atk*.12);say("¡Estás envenenado! ("+P.pzd+" de daño por turno)")}
-if(k=="drain")F.hp=Math.min(F.max,F.hp+Math.floor(d/2));
+if(k=="pois"||k=="nuke"||k=="thorns"||k=="forest"){P.pz=3;P.pzd=Math.round(2+F.atk*.12);say("¡Estás envenenado! ("+P.pzd+" de daño por turno)")}
+if(k=="drain"||k=="shade"||k=="sentence"||k=="touch"||k=="brush"||k=="crimson")F.hp=Math.min(F.max,F.hp+Math.floor(d/2));
 if(k=="fire"||k=="inferno"){P.bn={t:3,d:Math.max(2,Math.round(F.atk*.2))};say("¡Estás ardiendo!")}
 if(P.hp<=0)return die();
-if(k=="stun"){say("¡Quedas paralizado y pierdes el turno!");draw();setTimeout(foe,900);return}
+if(k=="stun"||k=="glow"||k=="vines"){say("¡Quedas paralizado y pierdes el turno!");draw();setTimeout(foe,900);return}
 end()}
 function die(){snd("lose");saveRec(P.f);P.hp=0;over=true;say("Has caído en el combate "+(P.f+1)+".");draw()}
 function win(){
